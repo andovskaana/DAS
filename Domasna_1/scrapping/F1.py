@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 
+
 # Proverka dali e obvrznik ili sodrzi brojka
 def is_valid_issuer_code(s):
     for char in s:
@@ -11,8 +12,10 @@ def is_valid_issuer_code(s):
             return False
     return True
 
+
 def filter_1():
     response = requests.get("https://www.mse.mk/page.aspx/stats/symbolhistory/ADIN")
+    print(response.status_code)
 
     response.raise_for_status()
 
@@ -29,11 +32,17 @@ def filter_1():
                 symbols.append(symbol)
 
     # Zacuvaj vo CSV
-    with open('symbols.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["issuer_code"])
-        for symbol in symbols:
-            writer.writerow([symbol])
+    try:
+        with open('symbols.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["issuer_code"])
+            for symbol in symbols:
+                writer.writerow([symbol])
+        print("CSV file saved successfully.")
+    except Exception as e:
+        print(f"Error saving CSV: {e}")
 
     # Za testiranje
     print("Issuer Codes:", symbols)
+
+    return symbols
