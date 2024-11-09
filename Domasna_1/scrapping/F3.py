@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import csv
 
+from DAS.Domasna_1.scrapping.DB import insert_stock_data, update_last_date
+
 
 async def fetch_data_for_dates(session, issuer_code, start_date, end_date):
     """Fetch data for a specific issuer between start and end dates in 365-day increments."""
@@ -59,28 +61,60 @@ def parse_data(page_content):
 
 
 def reformat_number(value):
-    """Reformats a numeric string to use dots for thousands and commas for decimals."""
-    # Remove commas for thousands, replace dot with comma for decimals, then add dots for thousands
+    """Reformats a numeric string to use dots for thousands and commas for decimals,
+    adding decimal places only if originally present."""
     try:
-        # Remove commas if present, and convert to float for accurate decimal handling
+        # Remove commas if present
         num = float(value.replace(',', ''))
-        # Format with dots as thousands separator and comma as decimal separator
-        return f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        # Determine formatting based on the presence of decimals in the original input
+        if '.' in value:
+            # Format with 2 decimal places
+            formatted_value = f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        else:
+            # Format without decimal places
+            formatted_value = f"{num:,.0f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        return formatted_value
     except ValueError:
         return value
 
 
-def save_all_to_csv(results, issuers):
-    """Saves all issuer data in one CSV file."""
-    with open("all_issuers_data.csv", "w", newline="") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["IssuerCode", "Date", "Price", "Max", "Min", "Avg", "Volume", "Turnover", "All"])
+# def save_all_to_csv(results, issuers):
+#     """Saves all issuer data in one CSV file."""
+#     with open("all_issuers_data.csv", "w", newline="") as csvfile:
+#         writer = csv.writer(csvfile)
+#         writer.writerow(["IssuerCode", "Date", "Price", "Max", "Min", "Avg", "Volume", "Turnover", "All"])
+#
+#         for issuer, data in zip(issuers, results):
+#             if data:
+#                 for row in data:
+#                     formatted_row = [issuer] + [reformat_number(cell) if i in {1, 2, 3, 4, 5, 6, 7, 8} else cell for
+#                                                 i, cell
+#                                                 in enumerate(row)]
+#                     writer.writerow(formatted_row)  # Include issuer code in each row
+#     print("Data saved to all_issuers_data.csv")
 
-        for issuer, data in zip(issuers, results):
-            if data:
-                for row in data:
-                    formatted_row = [issuer] + [reformat_number(cell) if i in {1, 2, 3, 4, 5, 7, 8} else cell for
-                                                i, cell
-                                                in enumerate(row)]
-                    writer.writerow(formatted_row)  # Include issuer code in each row
-    print("Data saved to all_issuers_data.csv")
+def save_to_database(results, issuers):
+    """Saves all issuer data to the database."""
+    for issuer, data in zip(issuers, results):
+        if data:
+            formatted_data = []
+            for row in data:
+                # Date and symbol remain as strings, others are converted to numbers
+                formatted_row = [
+                    row[0],  # Date
+                    float(reformat_number(row[1])),  # LastTradePrice
+                    float(reformat_number(row[2])),  # Max
+                    float(reformat_number(row[3])),  # Min
+                    float(reformat_number(row[4])),  # AvgPrice
+                    float(reformat_number(row[5])),  # PercentageChange
+                    int(reformat_number(row[6])),  # Volume
+                    int(reformat_number(row[7])),  # TurnoverInBEST
+                    int(reformat_number(row[8]))  # TotalTurnover
+                ]
+                formatted_data.append(formatted_row)
+            # Insert formatted data into the database
+            insert_stock_data(issuer, formatted_data)
+
+    print("Data saved to the database.")

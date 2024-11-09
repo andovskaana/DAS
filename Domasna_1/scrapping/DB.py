@@ -70,19 +70,38 @@ def update_last_date(symbol, last_date):
 
 # Insert stock data into StockData table
 def insert_stock_data(symbol, data):
+    # db_path = os.path.join('data', 'stock_data.db')
+    # conn = sqlite3.connect(db_path)
+    # cursor = conn.cursor()
+    #
+    # for row in data:
+    #     date, last_trade_price, max_price, min_price, avg_price, percentage_change, volume, turnover_best, total_turnover = row
+    #     cursor.execute('''
+    #     INSERT OR IGNORE INTO StockData (
+    #         Symbol, Date, LastTradePrice, Max, Min, AvgPrice, PercentageChange,
+    #         Volume, TurnoverInBEST, TotalTurnover
+    #     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    #     ''', (symbol, date, last_trade_price, max_price, min_price, avg_price,
+    #           percentage_change, volume, turnover_best, total_turnover))
+    #
+    # conn.commit()
+    # conn.close()
     db_path = os.path.join('data', 'stock_data.db')
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    for row in data:
-        date, last_trade_price, max_price, min_price, avg_price, percentage_change, volume, turnover_best, total_turnover = row
-        cursor.execute('''
-        INSERT OR IGNORE INTO StockData (
-            Symbol, Date, LastTradePrice, Max, Min, AvgPrice, PercentageChange,
-            Volume, TurnoverInBEST, TotalTurnover
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (symbol, date, last_trade_price, max_price, min_price, avg_price,
-              percentage_change, volume, turnover_best, total_turnover))
+    # Prepare data in the format needed for executemany
+    bulk_data = [
+        (symbol, row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8])
+        for row in data
+    ]
+
+    cursor.executemany('''
+           INSERT OR IGNORE INTO StockData (
+               Symbol, Date, LastTradePrice, Max, Min, AvgPrice, PercentageChange,
+               Volume, TurnoverInBEST, TotalTurnover
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ''', bulk_data)
 
     conn.commit()
     conn.close()
