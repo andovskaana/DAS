@@ -58,6 +58,18 @@ def parse_data(page_content):
     return data
 
 
+def reformat_number(value):
+    """Reformats a numeric string to use dots for thousands and commas for decimals."""
+    # Remove commas for thousands, replace dot with comma for decimals, then add dots for thousands
+    try:
+        # Remove commas if present, and convert to float for accurate decimal handling
+        num = float(value.replace(',', ''))
+        # Format with dots as thousands separator and comma as decimal separator
+        return f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except ValueError:
+        return value
+
+
 def save_all_to_csv(results, issuers):
     """Saves all issuer data in one CSV file."""
     with open("all_issuers_data.csv", "w", newline="") as csvfile:
@@ -67,5 +79,8 @@ def save_all_to_csv(results, issuers):
         for issuer, data in zip(issuers, results):
             if data:
                 for row in data:
-                    writer.writerow([issuer] + row)  # Include issuer code in each row
+                    formatted_row = [issuer] + [reformat_number(cell) if i in {1, 2, 3, 4, 5, 7, 8} else cell for
+                                                i, cell
+                                                in enumerate(row)]
+                    writer.writerow(formatted_row)  # Include issuer code in each row
     print("Data saved to all_issuers_data.csv")
