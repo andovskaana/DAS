@@ -4,7 +4,7 @@ import time
 from F3 import filter_3, save_to_database
 from F1 import filter_1
 from F2 import filter_2
-from DB import update_last_date
+from DB import update_last_date, init_createDB
 
 
 async def fetch_all_issuers(issuers, end_date):
@@ -35,6 +35,7 @@ async def fetch_all_issuers(issuers, end_date):
 
 
 if __name__ == "__main__":
+    init_createDB()
     # Parameters
     end_date = datetime.now().strftime('%m/%d/%Y')
     issuers = filter_1()  # Get issuer codes using filter_1

@@ -31,8 +31,8 @@ def init_createDB():
         AvgPrice REAL,
         PercentageChange REAL,
         Volume INTEGER,
-        TurnoverInBEST REAL,
-        TotalTurnover REAL,
+        TurnoverInBEST TEXT,
+        TotalTurnover TEXT,
         PRIMARY KEY (Symbol, Date),
         FOREIGN KEY (Symbol) REFERENCES SymbolTracking(Symbol)
     )
