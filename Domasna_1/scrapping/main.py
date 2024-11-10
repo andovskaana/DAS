@@ -1,10 +1,11 @@
 import asyncio
 from datetime import datetime
 import time
-from F3 import fetch_data, save_to_database
+from F3 import filter_3, save_to_database
 from F1 import filter_1
 from F2 import filter_2
 from DB import update_last_date
+
 
 async def fetch_all_issuers(issuers, end_date):
     """Fetch data for all issuers asynchronously using the last saved date from the database."""
@@ -18,7 +19,7 @@ async def fetch_all_issuers(issuers, end_date):
         start_date = last_saved_date if last_saved_date else "11/10/2014"
 
         # Create an asynchronous task for each issuer using fetch_data
-        task = asyncio.create_task(fetch_data(issuer_code, start_date, end_date))
+        task = asyncio.create_task(filter_3(issuer_code, start_date))
         tasks.append(task)
 
     # Gather all results asynchronously
@@ -26,11 +27,12 @@ async def fetch_all_issuers(issuers, end_date):
 
     # Save all data to CSV
     # save_all_to_csv(results, issuers)
-    save_to_database(results, issuers)
+    save_to_database(results,issuers)
 
     # Update last saved date in the database for each issuer after saving
     for issuer_code in issuers:
         update_last_date(issuer_code, end_date)
+
 
 if __name__ == "__main__":
     # Parameters

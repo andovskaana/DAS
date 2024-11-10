@@ -23,11 +23,12 @@ async def fetch_data_for_dates(session, issuer_code, start_date, end_date):
             return None
 
 
-async def fetch_data(issuer_code, start_date, end_date):
+async def filter_3(issuer_code, start_date):
     """Fetch data for the issuer, ensuring that each request covers a 365-day range."""
     async with aiohttp.ClientSession() as session:
         current_start = datetime.strptime(start_date, '%m/%d/%Y')
-        final_end = datetime.strptime(end_date, '%m/%d/%Y')
+        end = datetime.now().strftime('%m/%d/%Y')
+        final_end = datetime.strptime(end, '%m/%d/%Y')
         all_data = []
 
         while current_start < final_end:
@@ -58,7 +59,6 @@ def parse_data(page_content):
         if len(cols) > 6 and cols[6] != '0':  # Check volume is not zero
             data.append(cols)
     return data
-
 
 def reformat_number(value):
     """Reformats a numeric string to use dots for thousands and commas for decimals,
@@ -104,17 +104,18 @@ def save_to_database(results, issuers):
                 # Date and symbol remain as strings, others are converted to numbers
                 formatted_row = [
                     row[0],  # Date
-                    float(reformat_number(row[1])),  # LastTradePrice
-                    float(reformat_number(row[2])),  # Max
-                    float(reformat_number(row[3])),  # Min
-                    float(reformat_number(row[4])),  # AvgPrice
-                    float(reformat_number(row[5])),  # PercentageChange
-                    int(reformat_number(row[6])),  # Volume
-                    int(reformat_number(row[7])),  # TurnoverInBEST
-                    int(reformat_number(row[8]))  # TotalTurnover
+                    reformat_number(row[1]),  # LastTradePrice
+                    reformat_number(row[2]),  # Max
+                    reformat_number(row[3]),  # Min
+                    reformat_number(row[4]),  # AvgPrice
+                    reformat_number(row[5]),  # PercentageChange
+                    str(reformat_number(row[6])),  # Volume
+                    str(reformat_number(row[7])),  # TurnoverInBEST
+                    str(reformat_number(row[8]))  # TotalTurnover
                 ]
                 formatted_data.append(formatted_row)
             # Insert formatted data into the database
             insert_stock_data(issuer, formatted_data)
 
     print("Data saved to the database.")
+
