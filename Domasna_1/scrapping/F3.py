@@ -4,7 +4,10 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import csv
 
-from DAS.Domasna_1.scrapping.DB import insert_stock_data, update_last_date
+from Domasna_1.scrapping.DB import insert_stock_data
+
+
+#from DAS.Domasna_1.scrapping.DB import insert_stock_data, update_last_date
 
 
 async def fetch_data_for_dates(session, issuer_code, start_date, end_date):
