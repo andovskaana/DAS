@@ -39,7 +39,6 @@ python main.py
 ```
 
 ## Наше Тестирање
-За тестирање, достапно е видео демо во кое прикажуваме времетраењето на исполнување на целата база од денешниот датум назад 10 години:[ Извршување ](https://drive.google.com/file/d/1o58W1mq8KrkPgqEN-_0yjGTWqjN3Ac0B/view?fbclid=IwY2xjawGd9ixleHRuA2FlbQIxMQABHcVXkn6G3mZReFNafQ5ZXY1kKA8cipPUJu11O9HU7QTz3lirw4FGG7aEWw_aem_nnWS56YiDxVI-61LL4SVUw&pli=1).
 ### Користени перформанси за тестирање:
 *  13th Gen Intel(R) Core(TM) i9-13900KF
 *  32768MB RAM
