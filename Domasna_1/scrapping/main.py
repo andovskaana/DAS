@@ -1,52 +1,43 @@
+from F1 import filter_1
+from multiprocessing import Pool, cpu_count
 import asyncio
+from F2 import filter_2
+from F3 import filter_3, save_to_database
+from DB import update_last_date, init_createDB
 from datetime import datetime
 import time
-from F3 import filter_3, save_to_database
-from F1 import filter_1
-from F2 import filter_2
-from DB import update_last_date, init_createDB
 
 
-async def fetch_all_issuers(issuers, end_date):
-    """Fetch data for all issuers asynchronously using the last saved date from the database."""
-    tasks = []
+def process_issuer(issuer):
+    """Processes a single issuer's data."""
+    issuer_code, last_saved_date = filter_2(issuer)
+    start_date = last_saved_date if last_saved_date else "11/10/2014"
+    data = asyncio.run(filter_3(issuer_code, start_date))
+    return issuer_code, data
 
-    for issuer in issuers:
-        # Apply filter_2 to get the issuer code and last saved date
-        issuer_code, last_saved_date = filter_2(issuer)
 
-        # Set the start date to the last saved date or a default start date if no data is saved
-        start_date = last_saved_date if last_saved_date else "11/10/2014"
+def scrape_all_issuers(issuers, end_date):
+    """Scrapes data for all issuers using multi-core processing."""
+    with Pool(cpu_count()) as pool:
+        results = pool.map(process_issuer, issuers)  
 
-        # Create an asynchronous task for each issuer using fetch_data
-        task = asyncio.create_task(filter_3(issuer_code, start_date))
-        tasks.append(task)
+    for issuer, data in results:
+        save_to_database([data], [issuer])
+        update_last_date(issuer, end_date)
 
-    # Gather all results asynchronously
-    results = await asyncio.gather(*tasks)
-
-    # Save all data to CSV
-    # save_all_to_csv(results, issuers)
-    save_to_database(results,issuers)
-
-    # Update last saved date in the database for each issuer after saving
-    for issuer_code in issuers:
-        update_last_date(issuer_code, end_date)
+    print("Scraping completed.")
 
 
 if __name__ == "__main__":
     init_createDB()
-    # Parameters
-    end_date = datetime.now().strftime('%m/%d/%Y')
-    issuers = filter_1()  # Get issuer codes using filter_1
 
-    # Track start time
+    end_date = datetime.now().strftime('%m/%d/%Y')
+    issuers = filter_1()
+
     start_time = time.time()
 
-    # Run the async function
-    asyncio.run(fetch_all_issuers(issuers, end_date))
+    scrape_all_issuers(issuers, end_date)
 
-    # Track end time and calculate duration
     end_time = time.time()
     execution_time = end_time - start_time
 
