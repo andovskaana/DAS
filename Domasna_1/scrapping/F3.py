@@ -117,5 +117,5 @@ def save_to_database(results, issuers):
             # Insert formatted data into the database
             insert_stock_data(issuer, formatted_data)
 
-    print("Data saved to the database.")
+
 
