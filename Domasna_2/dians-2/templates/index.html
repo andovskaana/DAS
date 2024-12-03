@@ -29,6 +29,30 @@
             <span class="notification-icon">🔔</span>
         </header>
         <h2>Historical Data</h2>
+
+        <!-- Filters Form -->
+        <form method="get" action="{{ url_for('index') }}" class="filters-form">
+            <label for="from_date">From Date:</label>
+            <input type="date" id="from_date" name="from_date" value="{{ from_date }}">
+
+            <label for="to_date">To Date:</label>
+            <input type="date" id="to_date" name="to_date" value="{{ to_date }}">
+
+            <label for="issuer">Issuer:</label>
+            <select id="issuer" name="issuer">
+
+                <option value="ALL" {% if issuer == "ALL" %}selected{% endif %}>All</option>
+                {% for issuer_option in issuers %}
+                <option value="{{ issuer_option }}" {% if issuer == issuer_option %}selected{% endif %}>
+                    {{ issuer_option }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit">Apply Filters</button>
+        </form>
+
+        <!-- Data Table -->
         <table class="styled-table">
             <thead>
                 <tr>

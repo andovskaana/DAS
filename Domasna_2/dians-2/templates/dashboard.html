@@ -27,7 +27,27 @@
         <header>
             <h1>Dashboard</h1>
         </header>
-        <p>This is the dashboard page. Add your content here.</p>
+        <h2>Top 10 Most Tradeable Stocks</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Issuer</th>
+                    <th>Average Price</th>
+                    <th>Volume</th>
+                    <th>Turnover</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stock in stocks %}
+                <tr>
+                    <td>{{ stock[0] }}</td>
+                    <td>{{ stock[1] }}</td>
+                    <td>{{ stock[2] }}</td>
+                    <td>{{ stock[3] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </body>
 </html>

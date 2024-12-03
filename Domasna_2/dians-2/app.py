@@ -54,24 +54,38 @@ def index():
     params = []
 
     if from_date:
-        query += " AND Date >= ?"
+        query += """
+        AND CAST(SUBSTR(Date, -4, 4) || '-' ||
+                 printf('%02d', CAST(SUBSTR(Date, 1, INSTR(Date, '/') - 1) AS INTEGER)) || '-' ||
+                 printf('%02d', CAST(SUBSTR(Date, INSTR(Date, '/') + 1, LENGTH(Date) - INSTR(Date, '/')) AS INTEGER))
+             AS TEXT) >= ?
+        """
         params.append(from_date)
+
     if to_date:
-        query += " AND Date <= ?"
+        query += """
+        AND CAST(SUBSTR(Date, -4, 4) || '-' ||
+                 printf('%02d', CAST(SUBSTR(Date, 1, INSTR(Date, '/') - 1) AS INTEGER)) || '-' ||
+                 printf('%02d', CAST(SUBSTR(Date, INSTR(Date, '/') + 1, LENGTH(Date) - INSTR(Date, '/')) AS INTEGER))
+             AS TEXT) <= ?
+        """
         params.append(to_date)
+
     if issuer != "ALL":
         query += " AND Symbol = ?"
         params.append(issuer)
-
+    print(query)
+    print(params)
     # Fetch filtered rows from the database
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute(query, params)
+    # cursor.execute("SELECT * FROM StockData WHERE Date >= '2/1/2022' AND Date <= '2/28/2022';")
     rows = cursor.fetchall()
     conn.close()
-
-   # print(f"Fetched rows from database: {rows}")
-    #print(f"Issuers: {issuers}")
+    print(rows)
+    # print(f"Fetched rows from database: {rows}")
+    # print(f"Issuers: {issuers}")
     return render_template(
         'index.html',
         rows=rows,
@@ -84,8 +98,9 @@ def index():
 
 @app.route('/dashboard')
 def dashboard():
-    """Dashboard page."""
+
     return render_template('dashboard.html')
+
 
 
 @app.route('/analytics/technical-analysis')

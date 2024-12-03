@@ -30,7 +30,7 @@ def init_createDB():
         Min REAL,
         AvgPrice REAL,
         PercentageChange REAL,
-        Volume INTEGER,
+        Volume TEXT,
         TurnoverInBEST TEXT,
         TotalTurnover TEXT,
         PRIMARY KEY (Symbol, Date),
