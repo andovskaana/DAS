@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>StockApp</h2>
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}" class="active">Dashboard</a></li>
+                <li><a href="#">Analytics</a>
+                    <ul>
+                        <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
+                        <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
+                        <li><a href="{{ url_for('lstm') }}">LSTM</a></li>
+                    </ul>
+                </li>
+                <li><a href="{{ url_for('index') }}">Historical Data</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="main-content">
+        <header>
+            <h1>Dashboard</h1>
+        </header>
+        <p>This is the dashboard page. Add your content here.</p>
+    </div>
+</body>
+</html>

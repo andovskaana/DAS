@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockApp</title>
+    <title>Historical Data</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -11,14 +11,15 @@
         <h2>StockApp</h2>
         <nav>
             <ul>
-                <li><a href="#">Dashboard</a></li>
-                <li><a href="#">Analytics</a></li>
-                <li class="submenu">
-                    <a href="#">Technical Analysis</a>
-                    <a href="#">Fundamental Analysis</a>
-                    <a href="#">LSTM</a>
+                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li><a href="#">Analytics</a>
+                    <ul>
+                        <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
+                        <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
+                        <li><a href="{{ url_for('lstm') }}">LSTM</a></li>
+                    </ul>
                 </li>
-                <li><a href="#" class="active">Historical Data</a></li>
+                <li><a href="{{ url_for('index') }}" class="active">Historical Data</a></li>
             </ul>
         </nav>
     </div>
