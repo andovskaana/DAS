@@ -98,8 +98,45 @@ def index():
 
 @app.route('/dashboard')
 def dashboard():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
 
-    return render_template('dashboard.html')
+    # SQL query to calculate the 10 most tradeable stocks based on volume and turnover
+    query = """
+SELECT 
+    Symbol, 
+    AvgPrice,
+    PercentageChange,
+    CAST(REPLACE(Volume, ',', '') AS INTEGER) AS DailyTotalVolume,
+    TotalTurnover
+FROM StockData
+WHERE Date = (
+    SELECT COALESCE(
+        (SELECT CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
+                CAST(STRFTIME('%d', 'now', 'localtime') AS INTEGER) || '/' || 
+                STRFTIME('%Y', 'now', 'localtime')
+         FROM StockData
+         WHERE Date = CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
+                      CAST(STRFTIME('%d', 'now', 'localtime') AS INTEGER) || '/' || 
+                      STRFTIME('%Y', 'now', 'localtime')
+         LIMIT 1),
+        (SELECT CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
+                CAST(STRFTIME('%d', 'now', 'localtime') - 1 AS INTEGER) || '/' || 
+                STRFTIME('%Y', 'now', 'localtime')
+         FROM StockData
+         WHERE Date = CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
+                      CAST(STRFTIME('%d', 'now', 'localtime') - 1 AS INTEGER) || '/' || 
+                      STRFTIME('%Y', 'now', 'localtime')
+         LIMIT 1)
+    )
+)
+ORDER BY DailyTotalVolume DESC
+LIMIT 10;"""
+    cursor.execute(query)
+    stocks = cursor.fetchall()
+    conn.close()
+
+    return render_template('dashboard.html', stocks=stocks)
 
 
 

@@ -28,11 +28,12 @@
             <h1>Dashboard</h1>
         </header>
         <h2>Top 10 Most Tradeable Stocks</h2>
-        <table>
+        <table class="styled-table">
             <thead>
                 <tr>
                     <th>Issuer</th>
                     <th>Average Price</th>
+                    <th>Change in %</th>
                     <th>Volume</th>
                     <th>Turnover</th>
                 </tr>
@@ -44,6 +45,7 @@
                     <td>{{ stock[1] }}</td>
                     <td>{{ stock[2] }}</td>
                     <td>{{ stock[3] }}</td>
+                    <td>{{ stock[4] }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
