@@ -5,6 +5,7 @@ from datetime import datetime
 import asyncio
 from filters.F1 import filter_1
 from filters.F3 import filter_3
+from filters.F3 import reformat_number
 from DB import init_createDB, get_last_saved_date, update_data
 
 app = Flask(__name__)
@@ -25,11 +26,27 @@ def rescrape_and_update_data():
         last_saved_date = get_last_saved_date(issuer)
         if not last_saved_date or last_saved_date != today_date:
             print(f"Updating data for issuer: {issuer}")
-            data = asyncio.run(filter_3(issuer, last_saved_date or "11/10/2014"))
-            update_data(issuer, data, today_date)
+            raw_data = asyncio.run(filter_3(issuer, last_saved_date or "11/10/2014"))
+
+            # Reformat numeric fields in the fetched data
+            formatted_data = []
+            for row in raw_data:
+                formatted_row = [
+                    row[0],  # Date
+                    reformat_number(row[1]),  # LastTradePrice
+                    reformat_number(row[2]),  # Max
+                    reformat_number(row[3]),  # Min
+                    reformat_number(row[4]),  # AvgPrice
+                    reformat_number(row[5]),  # PercentageChange
+                    str(reformat_number(row[6])),  # Volume
+                    str(reformat_number(row[7])),  # TurnoverInBEST
+                    str(reformat_number(row[8]))  # TotalTurnover
+                ]
+                formatted_data.append(formatted_row)
+
+            update_data(issuer, formatted_data, today_date)
 
     print("Rescraping process completed.")
-
 
 @app.route('/')
 def index():
