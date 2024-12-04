@@ -50,7 +50,11 @@ def index():
     conn.close()
 
     # Build query based on filters
-    query = "SELECT * FROM StockData WHERE 1=1"
+    query = """
+        SELECT * 
+        FROM StockData 
+        WHERE 1=1
+    """
     params = []
 
     if from_date:
@@ -74,18 +78,23 @@ def index():
     if issuer != "ALL":
         query += " AND Symbol = ?"
         params.append(issuer)
-    print(query)
-    print(params)
+
+    # Add ORDER BY clause to sort by date
+    query += """
+    ORDER BY CAST(SUBSTR(Date, -4, 4) || '-' ||
+                  printf('%02d', CAST(SUBSTR(Date, 1, INSTR(Date, '/') - 1) AS INTEGER)) || '-' ||
+                  printf('%02d', CAST(SUBSTR(Date, INSTR(Date, '/') + 1, LENGTH(Date) - INSTR(Date, '/')) AS INTEGER))
+              AS TEXT) DESC
+    """
+
     # Fetch filtered rows from the database
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute(query, params)
-    # cursor.execute("SELECT * FROM StockData WHERE Date >= '2/1/2022' AND Date <= '2/28/2022';")
     rows = cursor.fetchall()
     conn.close()
-    print(rows)
-    # print(f"Fetched rows from database: {rows}")
-    # print(f"Issuers: {issuers}")
+
+    # Render the template with fetched data
     return render_template(
         'index.html',
         rows=rows,
