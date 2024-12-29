@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import sqlite3
 import os
 from datetime import datetime
@@ -14,6 +14,56 @@ DATABASE = os.path.join('data', 'stock_data.db')
 
 # Initialize the database
 init_createDB()
+
+
+def get_recommendation_counts(issuer):
+    # Query the database to count recommendations for the selected issuer
+    conn = sqlite3.connect('data/stock_data.db')  # Replace with your database
+    cursor = conn.cursor()
+    cursor.execute("""
+            SELECT 'buy' AS recommendation, COUNT(*) 
+            FROM all_info 
+            WHERE issuer = ? AND recommendation = 'buy'
+            UNION
+            SELECT 'sell' AS recommendation, COUNT(*) 
+            FROM all_info 
+            WHERE issuer = ? AND recommendation = 'sell'
+            UNION
+            SELECT 'hold' AS recommendation, COUNT(*) 
+            FROM all_info 
+            WHERE issuer = ? AND recommendation = 'hold'
+        """, (issuer, issuer, issuer))
+    results = cursor.fetchall()
+    conn.close()
+
+    # Process the results into a dictionary
+    counts = {"Buy": 0, "Sell": 0, "Hold": 0}
+    for recommendation, count in results:
+        recommendation = recommendation.capitalize()  # Converts 'hold' to 'Hold'
+        if recommendation in counts:
+            counts[recommendation] = count
+
+    if counts["Buy"] > counts["Sell"]:
+        recommendation = "Buy"
+    elif counts["Sell"] > counts["Buy"]:
+        recommendation = "Sell"
+    else:
+        recommendation = "Hold"
+
+    return {**counts, "Recommendation": recommendation}
+
+    # return counts
+
+
+def get_issuers():
+    # Connect to your database and fetch issuer names
+    conn = sqlite3.connect('data/stock_data.db')  # Replace with your database
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT issuer FROM recommendations")  # Assuming `issuers` table exists
+    issuers = cursor.fetchall()
+    conn.close()
+    return issuers
+
 
 
 def rescrape_and_update_data():
@@ -47,6 +97,7 @@ def rescrape_and_update_data():
             update_data(issuer, formatted_data, today_date)
 
     print("Rescraping process completed.")
+
 
 @app.route('/')
 def index():
@@ -165,17 +216,25 @@ LIMIT 10;"""
     return render_template('dashboard.html', stocks=stocks)
 
 
-
 @app.route('/analytics/technical-analysis')
 def technical_analysis():
     """Technical Analysis page."""
     return render_template('technical_analysis.html')
 
 
-@app.route('/analytics/fundamental-analysis')
+@app.route('/analytics/fundamental-analysis', methods=['GET'])
 def fundamental_analysis():
-    """Fundamental Analysis page."""
-    return render_template('fundamental_analysis.html')
+    issuers = get_issuers()
+    return render_template('fundamental_analysis.html', issuers=issuers)
+
+
+@app.route('/analytics/fundamental-analysis', methods=['POST'])
+def get_fundamental_data():
+    issuer_name = request.json.get('issuer')
+    if issuer_name:
+        data = get_recommendation_counts(issuer_name)
+        return jsonify(data)
+    return jsonify({})
 
 
 @app.route('/analytics/lstm')
