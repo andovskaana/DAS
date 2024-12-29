@@ -11,6 +11,17 @@ import pandas as pd
 import mplfinance as mpf
 app = Flask(__name__)
 from technical_analysis import plot_charts, generate_signals, calculate_bollinger_bands, calculate_rsi, clean_numeric_column, calculate_sma, calculate_stochastic_oscillator, calculate_ema, calculate_williams_percent_range, calculate_momentum
+import numpy as np
+import pandas as pd
+from lstm import train_and_predict, preprocess_data, generate_graph
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from keras import Sequential
+from keras.api.layers import LSTM, Dense, Dropout
+from keras.api.optimizers import Adam
+from sklearn.metrics import mean_squared_error
+
+
 
 DATABASE = os.path.join('data', 'stock_data.db')
 
@@ -433,11 +444,54 @@ def get_fundamental_data():
     return jsonify({})
 
 
-@app.route('/analytics/lstm')
-def lstm():
-    """LSTM page."""
-    return render_template('lstm.html')
+# @app.route('/analytics/lstm')
+# def lstm():
+#     """LSTM page."""
+#     return render_template('lstm.html')
 
+@app.route('/analytics/lstm', methods=['GET', 'POST'])
+def lstm():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT Symbol FROM StockData")
+    issuers = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    predicted_price = None
+    last_prices = None
+    graph_path = None
+    recommendation = None
+    error_message = None
+    selected_symbol = None
+
+    if request.method == 'POST':
+        selected_symbol = request.form.get('symbol')
+        predicted_price, last_prices, error_message = train_and_predict(selected_symbol)
+
+        # Generate graph
+        if last_prices is not None:
+            is_prediction_available = predicted_price is not None
+            graph_path = generate_graph(last_prices, predicted_price, selected_symbol, is_prediction_available)
+
+        # Generate recommendation only if prediction is available
+        if predicted_price:
+            last_price = last_prices[-1]
+            if predicted_price > last_price * 1.05:
+                recommendation = "Sell"
+            elif predicted_price < last_price * 0.95:
+                recommendation = "Buy"
+            else:
+                recommendation = "Hold"
+
+    return render_template(
+        'lstm.html',
+        issuers=issuers,
+        predicted_price=predicted_price,
+        recommendation=recommendation,
+        graph_path=graph_path,
+        error_message=error_message,
+        selected_symbol=selected_symbol
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
