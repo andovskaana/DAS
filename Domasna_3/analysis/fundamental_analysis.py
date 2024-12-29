@@ -150,3 +150,103 @@ def save_to_database(table, data):
 
     connection.commit()
     connection.close()
+
+
+async def fetch_attachment(session, attachment_id, issuer, last_scraped_date, file_name, attachment_ids_map):
+    base_url = "https://api.seinet.com.mk/public/documents/attachment/"
+    url = f"{base_url}{attachment_id}"  # Construct the URL for the specific attachment
+
+    # Check if the file is a PDF
+    if not file_name.lower().endswith('.pdf'):
+        # print(f"Skipping non-PDF file: {file_name}")
+        return
+
+    try:
+        async with session.get(url) as response:
+            if response.status == 200:
+                with io.BytesIO(await response.read()) as file:
+                    with pdfplumber.open(file) as pdf:
+                        all_text = ""
+                        for page in pdf.pages:
+                            all_text += page.extract_text()
+
+                        if not all_text.strip():
+                            return
+
+                        # Define the recommendation based on sentiment
+                        sentiment = TextBlob(all_text).sentiment.polarity
+                        if sentiment > 0:
+                            recommendation = actions["positive"]
+                        elif sentiment < 0:
+                            recommendation = actions["negative"]
+                        else:
+                            recommendation = actions["neutral"]
+
+                        save_to_database('all_info', (issuer, recommendation, last_scraped_date))
+                        update_last_scraped_date(issuer, last_scraped_date)
+
+                        # Add attachment ID to the map for the issuer
+                        if issuer not in attachment_ids_map:
+                            attachment_ids_map[issuer] = []
+                        attachment_ids_map[issuer].append(attachment_id)
+            else:
+                print(f"Failed to fetch attachment {attachment_id}: {response.status}")
+    except Exception as e:
+        print(f"Error extracting text from attachment {attachment_id}: {e}")
+
+
+async def fetch_documents(session, issuer_id, attachment_ids_map):
+    search_url = f"https://www.seinet.com.mk/search/{issuer_id}"
+    date_from = get_last_scraped_date(issuer_id)
+    date_to = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    try:
+        async with session.get(search_url) as response:
+            if response.status == 200:
+                # Simulate loading the page and triggering the POST request
+                data = {
+                    "issuerId": issuer_id,
+                    "languageId": 1,
+                    "channelId": 1,
+                    "dateFrom": date_from,
+                    "dateTo": date_to,
+                }
+
+                post_url = "https://api.seinet.com.mk/public/documents"
+
+                # print(f"Starting to fetch documents for Issuer ID {issuer_id}")
+
+                async with session.post(post_url, json=data) as post_response:
+                    if post_response.status == 200:
+                        post_data = await post_response.json()
+                        print(
+                            f"Fetched {len(post_data.get('data', []))} documents for Issuer ID {issuer_id}")  # Logging result count
+                        for document in post_data.get("data", []):
+                            # issuer = document["issuer"].get("localizedTerms", [{}])[0].get("displayName")
+                            issuer = issuers.get(issuer_id)
+                            published_date = document.get("publishedDate")
+
+                            for attachment in document.get("attachments", []):
+                                attachment_id = attachment.get("attachmentId")
+                                file_name = attachment.get("fileName")
+                                await fetch_attachment(session, attachment_id, issuer, date_from, file_name,
+                                                       attachment_ids_map)
+
+                    else:
+                        print(
+                            f"Failed to retrieve documents for Issuer ID {issuer_id}. Status code: {post_response.status}")
+            else:
+                print(f"Failed to load search page for Issuer ID {issuer_id}. Status code: {response.status}")
+    except Exception as e:
+        print(f"Error processing Issuer ID {issuer_id}: {e}")
+
+
+async def fetch_all_issuer_documents(session, issuer_ids):
+    attachment_ids_map = {}  # Dictionary to store attachment IDs by issuer
+    for issuer_id in issuer_ids:
+        # Fetch and save all documents and attachments for one issuer before moving to the next
+        await fetch_documents(session, issuer_id, attachment_ids_map)
+
+    # Print attachment IDs and their count for each issuer
+    for issuer, attachment_ids in attachment_ids_map.items():
+        print(f"Issuer: {issuer} -> Attachment IDs: {attachment_ids}")
+        print(f"Issuer: {issuer} -> Number of Attachments: {len(attachment_ids)}")
