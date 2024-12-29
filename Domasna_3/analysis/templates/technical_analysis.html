@@ -41,37 +41,90 @@
         {% if chart_path %}
         <h2>Analysis Results</h2>
         <h3>Candlestick Chart</h3>
-{#        <img src="{{ url_for('static', filename='charts/' + chart_path.split('static/')[-1]) }}" alt="Candlestick Chart">#}
-            <img src="{{ url_for('static', filename='charts/candlestick_' + selected_symbol + '.png') }}" alt="Candlestick Chart">
-
+        <img src="{{ url_for('static', filename='charts/candlestick_' + selected_symbol + '.png') }}" alt="Candlestick Chart">
         {% endif %}
 
         {% if final_signals %}
         <h3>Final Technical Signals</h3>
+
         <div>
             <h4>Daily Signals</h4>
-            <ul>
-                {% for signal in final_signals.daily %}
-                <li>{{ signal.Date }}: {{ signal.LastTradePrice }} - {{ signal.Final_Signal }}</li>
-                {% endfor %}
-            </ul>
+            {% if final_signals.daily and final_signals.daily|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for signal in final_signals.daily %}
+                    <tr>
+                        <td>{{ signal['Date'] }}</td>
+                        <td>{{ signal['LastTradePrice'] }}</td>
+                        <td>{{ signal['Final_Signal'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Not Sufficient Information, HOLD</p>
+            {% endif %}
         </div>
+
         <div>
             <h4>Weekly Signals</h4>
-            <ul>
-                {% for signal in final_signals.weekly %}
-                <li>{{ signal.Date }}: {{ signal.LastTradePrice }} - {{ signal.Final_Signal }}</li>
-                {% endfor %}
-            </ul>
+            {% if final_signals.weekly and final_signals.weekly|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for signal in final_signals.weekly %}
+                    <tr>
+                        <td>{{ signal['Date'] }}</td>
+                        <td>{{ signal['LastTradePrice'] }}</td>
+                        <td>{{ signal['Final_Signal'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Not Sufficient Information, HOLD</p>
+            {% endif %}
         </div>
+
         <div>
             <h4>Monthly Signals</h4>
-            <ul>
-                {% for signal in final_signals.monthly %}
-                <li>{{ signal.Date }}: {{ signal.LastTradePrice }} - {{ signal.Final_Signal }}</li>
-                {% endfor %}
-            </ul>
+            {% if final_signals.monthly and final_signals.monthly|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for signal in final_signals.monthly %}
+                    <tr>
+                        <td>{{ signal['Date'] }}</td>
+                        <td>{{ signal['LastTradePrice'] }}</td>
+                        <td>{{ signal['Final_Signal'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Not Sufficient Information, HOLD</p>
+            {% endif %}
         </div>
+
         {% endif %}
     </div>
 </body>
