@@ -39,7 +39,7 @@ def init_createDB():
     ''')
 
     # Insert initial symbols from the CSV file into SymbolTracking
-    with open(os.path.join(".", 'symbols.csv'), 'r') as file:
+    with open(os.path.join("../tech_analysis/tech_prototype", 'symbols.csv'), 'r') as file:
         reader = csv.DictReader(file)
         for row in reader:
             symbol = row['issuer_code']
