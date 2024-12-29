@@ -201,48 +201,47 @@ def index():
         issuer=issuer
     )
 
-
 @app.route('/dashboard')
 def dashboard():
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
-    # SQL query to calculate the 10 most tradeable stocks based on volume and turnover
-    query = """
-SELECT 
-    Symbol, 
-    AvgPrice,
-    PercentageChange,
-    CAST(REPLACE(Volume, ',', '') AS INTEGER) AS DailyTotalVolume,
-    TotalTurnover
-FROM StockData
-WHERE Date = (
-    SELECT COALESCE(
-        (SELECT CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
-                CAST(STRFTIME('%d', 'now', 'localtime') AS INTEGER) || '/' || 
-                STRFTIME('%Y', 'now', 'localtime')
-         FROM StockData
-         WHERE Date = CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
-                      CAST(STRFTIME('%d', 'now', 'localtime') AS INTEGER) || '/' || 
-                      STRFTIME('%Y', 'now', 'localtime')
-         LIMIT 1),
-        (SELECT CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
-                CAST(STRFTIME('%d', 'now', 'localtime') - 1 AS INTEGER) || '/' || 
-                STRFTIME('%Y', 'now', 'localtime')
-         FROM StockData
-         WHERE Date = CAST(STRFTIME('%m', 'now', 'localtime') AS INTEGER) || '/' || 
-                      CAST(STRFTIME('%d', 'now', 'localtime') - 1 AS INTEGER) || '/' || 
-                      STRFTIME('%Y', 'now', 'localtime')
-         LIMIT 1)
-    )
-)
-ORDER BY DailyTotalVolume DESC
-LIMIT 10;"""
-    cursor.execute(query)
-    stocks = cursor.fetchall()
+    # Find the latest date in the database
+    latest_date_query = """
+    SELECT Date 
+    FROM StockData
+    ORDER BY CAST(SUBSTR(Date, 7, 4) || SUBSTR(Date, 1, 2) || SUBSTR(Date, 4, 2) AS INTEGER) DESC
+    LIMIT 1
+    """
+    cursor.execute(latest_date_query)
+    latest_date = cursor.fetchone()
+    latest_date = latest_date[0] if latest_date else None
+
+    if not latest_date:
+        # No data in the database
+        stocks = []
+    else:
+        # Retrieve the top 10 most tradeable stocks
+        query = """
+        SELECT 
+            Symbol, 
+            AvgPrice,
+            PercentageChange,
+            CAST(REPLACE(Volume, '.', '') AS INTEGER) AS DailyTotalVolume,
+            TotalTurnover
+        FROM StockData
+        WHERE Date = ?
+        ORDER BY DailyTotalVolume DESC
+        LIMIT 10
+        """
+        cursor.execute(query, (latest_date,))
+        stocks = cursor.fetchall()
+
     conn.close()
+    print(stocks)  # Debugging output to verify fetched data
 
     return render_template('dashboard.html', stocks=stocks)
+
 
 
 @app.route('/analytics/technical-analysis', methods=['GET', 'POST'])
