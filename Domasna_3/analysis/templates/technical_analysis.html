@@ -7,15 +7,22 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <div class="sidebar">
-        <h2>Menu</h2>
-        <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/dashboard">Dashboard</a></li>
-            <li><a href="/analytics/technical-analysis" class="active">Technical Analysis</a></li>
-            <li><a href="/analytics/lstm">LSTM Prediction</a></li>
-        </ul>
-    </div>
+  <div class="sidebar">
+    <h2>StockApp</h2>
+    <nav>
+      <ul>
+        <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li><a href="#">Analytics</a>
+          <ul>
+            <li><a href="{{ url_for('technical_analysis') }}" class="active">Technical Analysis</a></li>
+            <li><a href="{{ url_for('fundamental_analysis') }}" >Fundamental Analysis</a></li>
+            <li><a href="{{ url_for('lstm') }}">LSTM</a></li>
+          </ul>
+        </li>
+        <li><a href="{{ url_for('index') }}">Historical Data</a></li>
+      </ul>
+    </nav>
+  </div>
 
     <div class="main-content">
         <header>
@@ -50,7 +57,7 @@
         <div>
             <h4>Daily Signals</h4>
             {% if final_signals.daily and final_signals.daily|length > 0 %}
-            <table>
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -76,7 +83,7 @@
         <div>
             <h4>Weekly Signals</h4>
             {% if final_signals.weekly and final_signals.weekly|length > 0 %}
-            <table>
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Date</th>
@@ -102,7 +109,7 @@
         <div>
             <h4>Monthly Signals</h4>
             {% if final_signals.monthly and final_signals.monthly|length > 0 %}
-            <table>
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Date</th>
