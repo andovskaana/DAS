@@ -7,28 +7,29 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div class="sidebar">
-        <h2>StockApp</h2>
-        <nav>
-            <ul>
-                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                <li><a href="#">Analytics</a>
-                    <ul>
-                        <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
-                        <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
-                        <li><a href="{{ url_for('lstm') }}" class="active">LSTM</a></li>
-                    </ul>
-                </li>
-                <li><a href="{{ url_for('index') }}">Historical Data</a></li>
-            </ul>
-        </nav>
-    </div>
+<div class="sidebar">
+    <h2>StockApp</h2>
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+            <li><a href="#">Analytics</a>
+                <ul>
+                    <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
+                    <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
+                    <li><a href="{{ url_for('lstm') }}" class="active">LSTM</a></li>
+                </ul>
+            </li>
+            <li><a href="{{ url_for('index') }}">Historical Data</a></li>
+        </ul>
+    </nav>
+</div>
 
-    <div class="main-content">
+<div class="main-content">
     <header>
         <h1>LSTM Prediction</h1>
     </header>
 
+    <!-- Form for selecting stock symbol -->
     <form method="POST" action="{{ url_for('lstm') }}">
         <label for="symbol">Select Stock Symbol:</label>
         <select name="symbol" id="symbol">
@@ -39,19 +40,38 @@
         <button type="submit">Predict</button>
     </form>
 
+    <!-- Section for displaying prediction results -->
+    {% if predicted_price %}
+        <div class="results">
+            <h2>Prediction Results for {{ selected_symbol }}</h2>
+            <p><strong>Predicted Next Price:</strong> {{ predicted_price | round(2) }}</p>
+        </div>
+    {% endif %}
+
+    <!-- Section for displaying validation metrics -->
+    {% if metrics %}
+        <div class="metrics">
+            <h2>Validation Metrics</h2>
+            <p><strong>Mean Squared Error (MSE):</strong> {{ metrics.mse | round(4) }}</p>
+            <p><strong>Root Mean Squared Error (RMSE):</strong> {{ metrics.rmse | round(4) }}</p>
+        </div>
+    {% endif %}
+
+    <!-- Prediction Graph -->
     {% if graph_path %}
-    <div class="results">
-        <h2>Prediction Results for {{ selected_symbol }}</h2>
-        {% if predicted_price %}
-        <p><strong>Predicted Next Price:</strong> {{ predicted_price | round(2) }}</p>
-        <p><strong>Recommendation:</strong> {{ recommendation }}</p>
-        {% else %}
-        <p><strong>Not enough data for prediction. Displaying the last prices instead.</strong></p>
-        {% endif %}
-        <img src="/{{ graph_path }}" alt="Price Graph">
-    </div>
+        <div class="results">
+            <h2>Prediction Graph</h2>
+            <img src="/{{ graph_path }}" alt="Price Prediction Graph">
+        </div>
+    {% endif %}
+
+    <!-- Section for displaying error messages -->
+    {% if error_message %}
+        <div class="error">
+            <h2>Prediction Error</h2>
+            <p>{{ error_message }}</p>
+        </div>
     {% endif %}
 </div>
-
 </body>
 </html>

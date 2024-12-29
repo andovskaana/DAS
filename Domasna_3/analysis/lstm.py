@@ -7,6 +7,7 @@ from keras import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 import sqlite3
+import os
 import matplotlib.pyplot as plt
 
 DATABASE = 'data/stock_data.db'
@@ -59,11 +60,8 @@ def train_and_predict(symbol, time_step=60):
     time_step = min(time_step, len(scaled_data))
     X, y = create_dataset(scaled_data, time_step)
 
-    # Return only the last prices if there isn't enough data for training
     if X is None or len(X) < 2:
-        # Only take the first 3 columns for inverse transform (Max, Min, Volume)
-        last_prices = scaler.inverse_transform(scaled_data[-time_step:, :3])[:, 0]  # Take the first column (Max)
-        return None, last_prices, "Not enough data for prediction"
+        return None, None, "Not enough data for prediction"
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.3, shuffle=False)
     model = Sequential([
@@ -76,39 +74,39 @@ def train_and_predict(symbol, time_step=60):
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
     model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_val, y_val), verbose=0)
 
-    last_data = scaled_data[-time_step:].reshape(1, time_step, scaled_data.shape[1])
+    # Calculate metrics
+    y_val_pred = model.predict(X_val)
+    mse = mean_squared_error(y_val, y_val_pred)
+    rmse = np.sqrt(mse)
+
+    last_data = scaled_data[-time_step:].reshape(1, time_step, 3)
     next_price_scaled = model.predict(last_data)
+    next_price = scaler.inverse_transform(
+        np.concatenate((next_price_scaled, np.zeros((next_price_scaled.shape[0], 2))), axis=1)
+    )[:, 0]
 
-    # Prepare the data for inverse transformation
-    # Append zeros for the remaining columns to match the scaler input dimensions
-    next_price_full = np.concatenate(
-        (next_price_scaled, np.zeros((next_price_scaled.shape[0], scaled_data.shape[1] - 1))),
-        axis=1
-    )
-    next_price = scaler.inverse_transform(next_price_full)[:, 0]
-
-    # Get the last actual prices (use only the first 3 columns for inverse transform)
     last_prices = scaler.inverse_transform(scaled_data[-time_step:, :3])[:, 0]
 
-    return next_price[0], last_prices, None
+    # Generate graph
+    graph_path = generate_graph(last_prices, next_price[0], symbol)
 
 
-def generate_graph(last_prices, predicted_price, symbol, is_prediction_available=True):
+    return next_price[0], last_prices, {'mse': mse, 'rmse': rmse}, graph_path
+
+
+def generate_graph(last_prices, predicted_price, symbol):
     plt.figure(figsize=(10, 6))
     plt.plot(range(len(last_prices)), last_prices, label="Last Prices", color="blue")
-
-    if is_prediction_available:
-        plt.scatter(len(last_prices), predicted_price, color="red", label="Predicted Price")
-        plt.axvline(len(last_prices) - 1, linestyle="--", color="gray", label="Prediction Point")
-
+    plt.scatter(len(last_prices), predicted_price, color="red", label="Predicted Price")
+    plt.axvline(len(last_prices) - 1, linestyle="--", color="gray", label="Prediction Point")
     plt.title(f"{symbol} Price Prediction")
     plt.xlabel("Time")
     plt.ylabel("Price")
     plt.legend()
     plt.grid(True)
 
-    # Save the graph to a file
-    graph_path = f"static/graphs/{symbol}_prediction.png"
+    graph_path = os.path.join("static", "graphs", f"{symbol}_prediction.png")
+    os.makedirs(os.path.dirname(graph_path), exist_ok=True)
     plt.savefig(graph_path)
     plt.close()
     return graph_path

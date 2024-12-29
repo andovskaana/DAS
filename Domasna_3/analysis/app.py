@@ -13,7 +13,7 @@ app = Flask(__name__)
 from technical_analysis import plot_charts, generate_signals, calculate_bollinger_bands, calculate_rsi, clean_numeric_column, calculate_sma, calculate_stochastic_oscillator, calculate_ema, calculate_williams_percent_range, calculate_momentum
 import numpy as np
 import pandas as pd
-from lstm import train_and_predict, preprocess_data, generate_graph
+from lstm import train_and_predict, preprocess_data
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from keras import Sequential
@@ -461,18 +461,13 @@ def lstm():
     graph_path = None
     recommendation = None
     error_message = None
+    metrics = None
     selected_symbol = None
 
     if request.method == 'POST':
         selected_symbol = request.form.get('symbol')
-        predicted_price, last_prices, error_message = train_and_predict(selected_symbol)
+        predicted_price, last_prices, metrics, graph_path = train_and_predict(selected_symbol)
 
-        # Generate graph
-        if last_prices is not None:
-            is_prediction_available = predicted_price is not None
-            graph_path = generate_graph(last_prices, predicted_price, selected_symbol, is_prediction_available)
-
-        # Generate recommendation only if prediction is available
         if predicted_price:
             last_price = last_prices[-1]
             if predicted_price > last_price * 1.05:
@@ -488,9 +483,9 @@ def lstm():
         predicted_price=predicted_price,
         recommendation=recommendation,
         graph_path=graph_path,
+        metrics=metrics,
         error_message=error_message,
         selected_symbol=selected_symbol
     )
-
 if __name__ == '__main__':
     app.run(debug=True)
