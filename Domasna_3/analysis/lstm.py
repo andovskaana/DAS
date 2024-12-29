@@ -55,13 +55,13 @@ def create_dataset(data, time_step):
 def train_and_predict(symbol, time_step=60):
     scaled_data, scaler = preprocess_data(symbol)
     if scaled_data is None:
-        return None, None, "Not enough data for prediction"
+        return None, None, None, None  # Ensure 4 return values even when insufficient data
 
     time_step = min(time_step, len(scaled_data))
     X, y = create_dataset(scaled_data, time_step)
 
     if X is None or len(X) < 2:
-        return None, None, "Not enough data for prediction"
+        return None, None, None, None  # Ensure 4 return values
 
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.3, shuffle=False)
     model = Sequential([
@@ -74,7 +74,6 @@ def train_and_predict(symbol, time_step=60):
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
     model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_val, y_val), verbose=0)
 
-    # Calculate metrics
     y_val_pred = model.predict(X_val)
     mse = mean_squared_error(y_val, y_val_pred)
     rmse = np.sqrt(mse)
@@ -87,11 +86,10 @@ def train_and_predict(symbol, time_step=60):
 
     last_prices = scaler.inverse_transform(scaled_data[-time_step:, :3])[:, 0]
 
-    # Generate graph
     graph_path = generate_graph(last_prices, next_price[0], symbol)
 
-
     return next_price[0], last_prices, {'mse': mse, 'rmse': rmse}, graph_path
+
 
 
 def generate_graph(last_prices, predicted_price, symbol):

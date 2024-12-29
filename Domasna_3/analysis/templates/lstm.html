@@ -45,8 +45,12 @@
         <div class="results">
             <h2>Prediction Results for {{ selected_symbol }}</h2>
             <p><strong>Predicted Next Price:</strong> {{ predicted_price | round(2) }}</p>
+            {% if recommendation %}
+                <p><strong>Recommendation:</strong> {{ recommendation }}</p>
+            {% endif %}
         </div>
     {% endif %}
+
 
     <!-- Section for displaying validation metrics -->
     {% if metrics %}
@@ -70,6 +74,9 @@
         <div class="error">
             <h2>Prediction Error</h2>
             <p>{{ error_message }}</p>
+            {% if recommendation %}
+                <p><strong>Recommendation:</strong> {{ recommendation }}</p>
+            {% endif %}
         </div>
     {% endif %}
 </div>

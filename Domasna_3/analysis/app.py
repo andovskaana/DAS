@@ -468,7 +468,7 @@ def lstm():
         selected_symbol = request.form.get('symbol')
         predicted_price, last_prices, metrics, graph_path = train_and_predict(selected_symbol)
 
-        if predicted_price:
+        if predicted_price is not None and last_prices is not None:
             last_price = last_prices[-1]
             if predicted_price > last_price * 1.05:
                 recommendation = "Sell"
@@ -476,6 +476,9 @@ def lstm():
                 recommendation = "Buy"
             else:
                 recommendation = "Hold"
+        else:
+            error_message = "Not enough data for prediction."
+            recommendation = "Hold"
 
     return render_template(
         'lstm.html',
@@ -487,5 +490,6 @@ def lstm():
         error_message=error_message,
         selected_symbol=selected_symbol
     )
+
 if __name__ == '__main__':
     app.run(debug=True)
