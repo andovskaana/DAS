@@ -7,7 +7,9 @@ from filters.F1 import filter_1
 from filters.F3 import filter_3
 from filters.F3 import reformat_number
 from DB import init_createDB, get_last_saved_date, update_data
-
+import pandas as pd
+from technical_analysis import extend_to_time_frames
+import mplfinance as mpf
 app = Flask(__name__)
 
 DATABASE = os.path.join('data', 'stock_data.db')
@@ -216,10 +218,81 @@ LIMIT 10;"""
     return render_template('dashboard.html', stocks=stocks)
 
 
-@app.route('/analytics/technical-analysis')
+@app.route('/analytics/technical-analysis', methods=['GET', 'POST'])
 def technical_analysis():
-    """Technical Analysis page."""
-    return render_template('technical_analysis.html')
+    """Technical Analysis page using extended logic."""
+    # Fetch available issuers from the database
+    data_folder = 'data'
+    db_path = os.path.join(data_folder, 'stock_data.db')
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT Symbol FROM StockData")
+    issuers = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    candlestick_data = None
+    final_signals = None
+    chart_path = None
+
+    if request.method == 'POST':
+        stock_symbol = request.form.get('symbol')
+
+        # Fetch historical data for the selected stock
+        conn = sqlite3.connect(db_path)
+        query = """
+            SELECT Date, LastTradePrice, Max, Min, Volume
+            FROM StockData
+            WHERE Symbol = ?
+            ORDER BY Date ASC
+        """
+        historical_data = pd.read_sql_query(query, conn, params=(stock_symbol,))
+        conn.close()
+
+        if historical_data.empty:
+            return render_template(
+                'technical_analysis.html',
+                issuers=issuers,
+                error="No data found for the selected stock symbol."
+            )
+
+        # Preprocess data
+        historical_data['Date'] = pd.to_datetime(historical_data['Date'], format='%m/%d/%Y')
+        historical_data['LastTradePrice'] = historical_data['LastTradePrice'].replace(',', '', regex=True).astype(float)
+        historical_data['Max'] = historical_data['Max'].replace(',', '', regex=True).astype(float)
+        historical_data['Min'] = historical_data['Min'].replace(',', '', regex=True).astype(float)
+        historical_data['Volume'] = historical_data['Volume'].replace(',', '', regex=True).astype(float)
+        historical_data = historical_data.sort_values(by='Date').reset_index(drop=True)
+
+        # Extend to timeframes and calculate signals using provided logic
+        df_daily, df_weekly, df_monthly = extend_to_time_frames(historical_data)
+
+        # Generate candlestick data for frontend
+        df_candlestick = df_daily[['Date', 'LastTradePrice', 'Max', 'Min']].copy()
+        df_candlestick.columns = ['date', 'close', 'high', 'low']
+        df_candlestick['open'] = df_candlestick['close']  # Add Open column
+        candlestick_data = df_candlestick.to_dict(orient='records')
+
+        # Plot the candlestick chart and save it
+        df_candlestick.set_index('date', inplace=True)
+        chart_filename = f"candlestick_{stock_symbol}.png"
+        chart_path = os.path.join('static', 'charts', chart_filename)
+        mpf.plot(df_candlestick, type='candle', style='charles', title=f'Candlestick Chart for {stock_symbol}', volume=False, savefig=chart_path)
+
+        # Final signals
+        final_signals = {
+            "daily": df_daily[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
+            "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
+            "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records')
+        }
+
+    return render_template(
+        'technical_analysis.html',
+        issuers=issuers,
+        candlestick_data=candlestick_data,
+        selected_symbol=stock_symbol if request.method == 'POST' else None,
+        chart_path=chart_path,
+        final_signals=final_signals
+    )
 
 
 @app.route('/analytics/fundamental-analysis', methods=['GET'])
