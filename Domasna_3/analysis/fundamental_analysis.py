@@ -116,3 +116,37 @@ semaphore = asyncio.Semaphore(20)  # Limit to 5 concurrent requests
 # Mapping sentiment analysis to stock market actions
 actions = {"positive": "buy", "negative": "sell", "neutral": "hold"}
 
+# Database setup
+def setup_database():
+    connection = sqlite3.connect('data/stock_data.db')  # Connect to stock_data.db
+    cursor = connection.cursor()
+
+    cursor.execute('''
+         CREATE TABLE IF NOT EXISTS all_info (
+             issuer TEXT,
+             recommendation TEXT,
+             last_scraped_date TEXT
+         )
+     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS recommendations (
+            issuer TEXT PRIMARY KEY,
+            current_recommendation TEXT
+        )
+    ''')
+
+    connection.commit()
+    connection.close()
+
+
+def save_to_database(table, data):
+    connection = sqlite3.connect('data/stock_data.db')  # Connect to stock_data.db
+    cursor = connection.cursor()
+
+    if table == 'all_info':
+        cursor.execute('INSERT INTO all_info (issuer, recommendation, last_scraped_date) VALUES (?, ?, ?)', data)
+    elif table == 'recommendations':
+        cursor.execute('INSERT OR REPLACE INTO recommendations (issuer, current_recommendation) VALUES (?, ?)', data)
+
+    connection.commit()
+    connection.close()
