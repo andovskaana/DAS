@@ -4,30 +4,128 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Technical Analysis</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
     <div class="sidebar">
-        <h2>StockApp</h2>
-        <nav>
-            <ul>
-                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                <li><a href="#">Analytics</a>
-                    <ul>
-                        <li><a href="{{ url_for('technical_analysis') }}" class="active">Technical Analysis</a></li>
-                        <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
-                        <li><a href="{{ url_for('lstm') }}">LSTM</a></li>
-                    </ul>
-                </li>
-                <li><a href="{{ url_for('index') }}">Historical Data</a></li>
-            </ul>
-        </nav>
+        <h2>Menu</h2>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/analytics/technical-analysis" class="active">Technical Analysis</a></li>
+            <li><a href="/analytics/lstm">LSTM Prediction</a></li>
+        </ul>
     </div>
+
     <div class="main-content">
         <header>
             <h1>Technical Analysis</h1>
         </header>
-        <p>This is the technical analysis page. Add your content here.</p>
+
+        <form method="POST">
+            <label for="symbol">Select Stock Symbol:</label>
+            <select id="symbol" name="symbol" class="search-bar">
+                {% for issuer in issuers %}
+                <option value="{{ issuer }}" {% if issuer == selected_symbol %}selected{% endif %}>
+                    {{ issuer }}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="notification-icon">Analyze</button>
+        </form>
+
+        {% if error %}
+        <p style="color: red;">{{ error }}</p>
+        {% endif %}
+
+        {% if chart_path %}
+        <h2>Analysis Results</h2>
+        <h3>Candlestick Chart</h3>
+        <img src="{{ url_for('static', filename='charts/candlestick_' + selected_symbol + '.png') }}" alt="Candlestick Chart">
+        {% endif %}
+
+        {% if final_signals %}
+        <h3>Final Technical Signals</h3>
+
+        <div>
+            <h4>Daily Signals</h4>
+            {% if final_signals.daily and final_signals.daily|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for signal in final_signals.daily %}
+                    <tr>
+                        <td>{{ signal['Date'] }}</td>
+                        <td>{{ signal['LastTradePrice'] }}</td>
+                        <td>{{ signal['Final_Signal'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Not Sufficient Information, HOLD</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <h4>Weekly Signals</h4>
+            {% if final_signals.weekly and final_signals.weekly|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for signal in final_signals.weekly %}
+                    <tr>
+                        <td>{{ signal['Date'] }}</td>
+                        <td>{{ signal['LastTradePrice'] }}</td>
+                        <td>{{ signal['Final_Signal'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Not Sufficient Information, HOLD</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <h4>Monthly Signals</h4>
+            {% if final_signals.monthly and final_signals.monthly|length > 0 %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Price</th>
+                        <th>Signal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for signal in final_signals.monthly %}
+                    <tr>
+                        <td>{{ signal['Date'] }}</td>
+                        <td>{{ signal['LastTradePrice'] }}</td>
+                        <td>{{ signal['Final_Signal'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Not Sufficient Information, HOLD</p>
+            {% endif %}
+        </div>
+
+        {% endif %}
     </div>
 </body>
 </html>

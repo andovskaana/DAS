@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from Domasna_2.tech_prototype.DB import get_last_saved_date
+from Domasna_3.analysis.DB import get_last_saved_date
 
 def filter_2(issuer):
     # Initialize the date 10 years ago
