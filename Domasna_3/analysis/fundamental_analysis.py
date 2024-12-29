@@ -250,3 +250,40 @@ async def fetch_all_issuer_documents(session, issuer_ids):
     for issuer, attachment_ids in attachment_ids_map.items():
         print(f"Issuer: {issuer} -> Attachment IDs: {attachment_ids}")
         print(f"Issuer: {issuer} -> Number of Attachments: {len(attachment_ids)}")
+
+
+def calculate_final_recommendations():
+    connection = sqlite3.connect('data/stock_data.db')
+    cursor = connection.cursor()
+
+    # Fetch all sentiments grouped by issuer
+    cursor.execute("SELECT issuer, recommendation FROM all_info")
+    rows = cursor.fetchall()
+
+    # Group recommendations by issuer
+    issuer_sentiments = defaultdict(list)
+    for issuer, sentiment in rows:
+        issuer_sentiments[issuer].append(sentiment)
+
+    # Calculate the most common sentiment for each issuer
+    for issuer, sentiments in issuer_sentiments.items():
+        most_common_sentiment = Counter(sentiments).most_common(1)[0][0]
+
+        # Save the final sentiment to the recommendations table
+        save_to_database('recommendations', (issuer, most_common_sentiment))
+
+    connection.close()
+
+
+# Main function remains unchanged
+async def main():
+    setup_database()  # Ensure the database is set up
+    async with aiohttp.ClientSession() as session:
+        # Fetch documents for all issuers sequentially
+        await fetch_all_issuer_documents(session, issuer_ids)
+
+    # Calculate the final recommendations after all issuers are processed
+    calculate_final_recommendations()
+
+
+asyncio.run(main())
