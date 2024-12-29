@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LSTM</title>
+    <title>LSTM Prediction</title>
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -23,11 +23,35 @@
             </ul>
         </nav>
     </div>
+
     <div class="main-content">
-        <header>
-            <h1>LSTM</h1>
-        </header>
-        <p>This is the LSTM page. Add your content here.</p>
+    <header>
+        <h1>LSTM Prediction</h1>
+    </header>
+
+    <form method="POST" action="{{ url_for('lstm') }}">
+        <label for="symbol">Select Stock Symbol:</label>
+        <select name="symbol" id="symbol">
+            {% for issuer in issuers %}
+                <option value="{{ issuer }}" {% if issuer == selected_symbol %}selected{% endif %}>{{ issuer }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Predict</button>
+    </form>
+
+    {% if graph_path %}
+    <div class="results">
+        <h2>Prediction Results for {{ selected_symbol }}</h2>
+        {% if predicted_price %}
+        <p><strong>Predicted Next Price:</strong> {{ predicted_price | round(2) }}</p>
+        <p><strong>Recommendation:</strong> {{ recommendation }}</p>
+        {% else %}
+        <p><strong>Not enough data for prediction. Displaying the last prices instead.</strong></p>
+        {% endif %}
+        <img src="/{{ graph_path }}" alt="Price Graph">
     </div>
+    {% endif %}
+</div>
+
 </body>
 </html>

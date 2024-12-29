@@ -1,33 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fundamental Analysis</title>
-    <link rel="stylesheet" href="/static/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fundamental Analysis</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #1e1e2f;
+      color: #fff;
+    }
+    .sidebar {
+      width: 20%;
+      background-color: #25253b;
+      height: 100vh;
+      position: fixed;
+      padding: 20px;
+    }
+    .sidebar h2 {
+      color: #fff;
+      margin-bottom: 20px;
+    }
+    .sidebar nav ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    .sidebar nav ul li {
+      margin-bottom: 10px;
+    }
+    .sidebar nav ul li a {
+      text-decoration: none;
+      color: #a1a1c2;
+    }
+    .sidebar nav ul li a.active {
+      color: #fff;
+      font-weight: bold;
+    }
+    .main-content {
+      margin-left: 22%;
+      padding: 20px;
+    }
+    .stats-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+    .stats-box {
+      background-color: #2e2e4a;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      flex: 1;
+      margin: 0 10px;
+    }
+    .stats-box h2 {
+      font-size: 36px;
+      margin: 0;
+    }
+    .stats-box p {
+      margin: 10px 0 0;
+    }
+    .gauge-container, .chart-container {
+      margin-top: 40px;
+      text-align: center;
+    }
+    .chart-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    #results-container {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-    <div class="sidebar">
-        <h2>StockApp</h2>
-        <nav>
-            <ul>
-                <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                <li><a href="#">Analytics</a>
-                    <ul>
-                        <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
-                        <li><a href="{{ url_for('fundamental_analysis') }}" class="active">Fundamental Analysis</a></li>
-                        <li><a href="{{ url_for('lstm') }}">LSTM</a></li>
-                    </ul>
-                </li>
-                <li><a href="{{ url_for('index') }}">Historical Data</a></li>
-            </ul>
-        </nav>
+  <div class="sidebar">
+    <h2>StockApp</h2>
+    <nav>
+      <ul>
+        <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+        <li><a href="#">Analytics</a>
+          <ul>
+            <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
+            <li><a href="{{ url_for('fundamental_analysis') }}" class="active">Fundamental Analysis</a></li>
+            <li><a href="{{ url_for('lstm') }}">LSTM</a></li>
+          </ul>
+        </li>
+        <li><a href="{{ url_for('index') }}">Historical Data</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="main-content">
+    <header>
+      <h1>Fundamental Analysis</h1>
+    </header>
+    <label for="issuer">Select Issuer:</label>
+    <select name="issuer" id="issuer">
+      <option value="">-- Select an Issuer --</option>
+      {% for issuer in issuers %}
+      <option value="{{ issuer[0] }}">{{ issuer[0] }}</option>
+      {% endfor %}
+    </select>
+
+    <div id="results-container">
+      <div class="stats-container">
+        <div class="stats-box">
+          <h2 id="positive-count">N/A</h2>
+          <p>Positive Articles</p>
+        </div>
+        <div class="stats-box">
+          <h2 id="neutral-count">N/A</h2>
+          <p>Neutral Articles</p>
+        </div>
+        <div class="stats-box">
+          <h2 id="negative-count">N/A</h2>
+          <p>Negative Articles</p>
+        </div>
+      </div>
+
+<!--      <div class="gauge-container">-->
+<!--        <canvas id="gauge-chart" width="400" height="200"></canvas>-->
+<!--      </div>-->
+
+      <div class="chart-container" style="margin-top: 100px">
+        <canvas id="sentiment-chart"></canvas>
+      </div>
     </div>
-    <div class="main-content">
-        <header>
-            <h1>Fundamental Analysis</h1>
-        </header>
-        <p>This is the fundamental analysis page. Add your content here.</p>
-    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+      let sentimentChart; // Define a variable to hold the chart instance
+
+      document.getElementById('issuer').addEventListener('change', function () {
+        const issuer = this.value;
+        const resultsContainer = document.getElementById('results-container');
+
+        if (!issuer) {
+          resultsContainer.style.display = 'none';
+          return;
+        }
+
+        fetch('/analytics/fundamental-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ issuer }),
+        })
+          .then(response => response.json())
+          .then(data => {
+            // Update stats
+            document.getElementById('positive-count').textContent = data.Buy || 0;
+            document.getElementById('neutral-count').textContent = data.Hold || 0;
+            document.getElementById('negative-count').textContent = data.Sell || 0;
+
+            // Show results container
+            resultsContainer.style.display = 'block';
+
+            // Update gauge and sentiment charts
+            updateGaugeChart(data.Recommendation || 'Hold');
+            updateSentimentChart([data.Buy || 0, data.Hold || 0, data.Sell || 0]);
+          })
+          .catch(error => console.error('Error fetching data:', error));
+      });
+      const updateGaugeChart = (recommendation) => {
+        // Implement gauge chart logic based on `recommendation`
+      };
+
+      const updateSentimentChart = (data) => {
+        // Destroy the existing chart if it exists
+        if (sentimentChart) {
+          sentimentChart.destroy();
+        }
+
+        // Create a new sentiment chart
+        const ctx = document.getElementById('sentiment-chart').getContext('2d');
+        sentimentChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Positive', 'Neutral', 'Negative'],
+            datasets: [
+              {
+                label: 'Sentiment Distribution',
+                data: data,
+                backgroundColor: ['#4caf50', '#ffc107', '#f44336'], // Bar colors
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                ticks: {
+                  color: '#ffffff', // X-axis label color
+                },
+                grid: {
+                  color: '#ffffff', // X-axis gridline color
+                  drawOnChartArea: false, // Hide vertical gridlines
+                  drawTicks: true, // Show tick marks in white
+                },
+              },
+              y: {
+                ticks: {
+                  color: '#ffffff', // Y-axis label color
+                },
+                grid: {
+                  color: '#ffffff', // Y-axis gridline color
+                  drawOnChartArea: false, // Hide horizontal gridlines
+                  drawTicks: true, // Show tick marks in white
+                },
+              },
+            },
+            plugins: {
+              legend: {
+                labels: {
+                  color: '#ffffff', // Legend label color
+                },
+                onClick: (event) => {
+                  // Disable the legend click interaction
+                  event.stopPropagation();
+          },
+              },
+            },
+          },
+        });
+      };
+
+
+  </script>
 </body>
 </html>
