@@ -6,117 +6,103 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 
-
-# # Define necessary functions
-# data_folder = 'data'
-# db_path = os.path.join(data_folder, 'stock_data.db')
-#
-# # Connect to the SQLite database
-# conn = sqlite3.connect(db_path)
-#
-# # Define the stock name you want to filter by
-# stock_name = 'YourSpecificStockName'
-#
-# # Execute the query to retrieve the relevant data for the specific stock
-# query = f"SELECT Date, LastTradePrice, Max, Min, Volume FROM stock_data WHERE StockName = ? ORDER BY Date;"
-# df = pd.read_sql(query, conn, params=(stock_name,))
-
-# # Close the connection
-# conn.close()
 def clean_numeric_column(value):
-    """Converts numeric strings with thousands separators and commas to float."""
-    try:
-        return float(value.replace('.', '').replace(',', '.'))
-    except ValueError:
+    """Converts numeric strings with thousands separators ('.') and decimal commas (',') to float."""
+    if isinstance(value, str):
+        try:
+            return float(value.replace('.', '').replace(',', '.'))
+        except ValueError:
+            return np.nan
+    elif isinstance(value, (int, float)):
+        return value  # Already numeric
+    else:
         return np.nan
 
-
-def calculate_moving_average(df, window):
-    df[f'MA_{window}'] = df['LastTradePrice'].rolling(window=window).mean()
-    return df
-
-
-def calculate_rsi(df, window=14):
-    delta = df['LastTradePrice'].diff()
+def calculate_rsi(data, window=14):
+    delta = data.diff()
     gain = delta.where(delta > 0, 0).rolling(window=window).mean()
     loss = -delta.where(delta < 0, 0).rolling(window=window).mean()
     rs = gain / loss
-    df['RSI'] = 100 - (100 / (1 + rs))
-    return df
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
+def calculate_momentum(data, window):
+    return (data - data.shift(window)) / data.shift(window) * 100
 
-def calculate_bollinger_bands(df, window=5):
-    df['BB_MA'] = df['LastTradePrice'].rolling(window=window).mean()
-    df['BB_Upper'] = df['BB_MA'] + (df['LastTradePrice'].rolling(window=window).std() * 2)
-    df['BB_Lower'] = df['BB_MA'] - (df['LastTradePrice'].rolling(window=window).std() * 2)
-    return df
+def calculate_williams_percent_range(data, high, low, window):
+    highest_high = high.rolling(window=window).max()
+    lowest_low = low.rolling(window=window).min()
+    return -100 * (highest_high - data) / (highest_high - lowest_low)
 
+def calculate_stochastic_oscillator(data, high, low, window):
+    highest_high = high.rolling(window=window).max()
+    lowest_low = low.rolling(window=window).min()
+    return 100 * (data - lowest_low) / (highest_high - lowest_low)
+
+def calculate_sma(data, window):
+    return data.rolling(window=window).mean()
+
+def calculate_ema(data, window):
+    return data.ewm(span=window, adjust=False).mean()
+
+def calculate_bollinger_bands(data, window):
+    sma = calculate_sma(data, window)
+    std_dev = data.rolling(window=window).std()
+    upper_band = sma + (2 * std_dev)
+    lower_band = sma - (2 * std_dev)
+    return sma, upper_band, lower_band
+
+def calculate_ultimate_oscillator(data, high, low, window1=7, window2=14, window3=28):
+    buying_pressure = data - low
+    true_range = high - low
+
+    avg1 = buying_pressure.rolling(window=window1).sum() / true_range.rolling(window=window1).sum()
+    avg2 = buying_pressure.rolling(window=window2).sum() / true_range.rolling(window=window2).sum()
+    avg3 = buying_pressure.rolling(window=window3).sum() / true_range.rolling(window=window3).sum()
+
+    ultimate_oscillator = 100 * ((4 * avg1) + (2 * avg2) + avg3) / 7
+    return ultimate_oscillator
 
 def generate_signals(df):
-    # Moving Average Signal
-    df['MA_Signal'] = np.where(df['MA_3'] > df['LastTradePrice'], 'Sell',
-                               np.where(df['MA_3'] < df['LastTradePrice'], 'Buy', 'Hold'))
+    # Check if required columns exist
+    required_columns = ['RSI', 'Momentum', 'Williams_%R', 'Stochastic_Oscillator']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        df['Final_Signal'] = 'Not Sufficient Information'
+        return df
 
-    # RSI Signal
+    # Generate individual signals
     df['RSI_Signal'] = np.where(df['RSI'] < 30, 'Buy',
                                 np.where(df['RSI'] > 70, 'Sell', 'Hold'))
+    df['Momentum_Signal'] = np.where(df['Momentum'] > 0, 'Buy', 'Sell')
+    df['WPR_Signal'] = np.where(df['Williams_%R'] < -80, 'Buy',
+                                 np.where(df['Williams_%R'] > -20, 'Sell', 'Hold'))
+    df['Stochastic_Signal'] = np.where(df['Stochastic_Oscillator'] < 20, 'Buy',
+                                        np.where(df['Stochastic_Oscillator'] > 80, 'Sell', 'Hold'))
 
-    # Bollinger Bands Signal
-    df['BB_Signal'] = np.where(df['LastTradePrice'] > df['BB_Upper'], 'Sell',
-                               np.where(df['LastTradePrice'] < df['BB_Lower'], 'Buy', 'Hold'))
+    # Safely compute the mode for Final_Signal
+    signal_mode = df[['RSI_Signal', 'Momentum_Signal', 'WPR_Signal', 'Stochastic_Signal']].mode(axis=1)
+    if signal_mode.empty:
+        df['Final_Signal'] = 'Hold'
+    else:
+        df['Final_Signal'] = signal_mode[0].fillna('Hold')  # Default to 'Hold' for NaN values
 
-    # Final Signal
-    df['Final_Signal'] = df[['MA_Signal', 'RSI_Signal', 'BB_Signal']].mode(axis=1)[0]
     return df
 
-
-def extend_to_time_frames(df):
-    # Resample data
-    df_weekly = df.resample('W-Mon', on='Date').agg({
-        'LastTradePrice': 'mean',
-        'Max': 'max',
-        'Min': 'min',
-        'Volume': 'sum'
-    }).reset_index()
-
-    df_monthly = df.resample('ME', on='Date').agg({
-        'LastTradePrice': 'mean',
-        'Max': 'max',
-        'Min': 'min',
-        'Volume': 'sum'
-    }).reset_index()
-
-    # Apply indicator calculations
-    df_daily = calculate_moving_average(df, 3)
-    df_daily = calculate_moving_average(df_daily, 5)
-    df_daily = generate_signals(calculate_bollinger_bands(calculate_rsi(df_daily, 3), 5))
-
-    df_weekly = calculate_moving_average(df_weekly, 3)
-    df_weekly = calculate_moving_average(df_weekly, 5)
-    df_weekly = generate_signals(calculate_bollinger_bands(calculate_rsi(df_weekly, 3), 5))
-
-    df_monthly = calculate_moving_average(df_monthly, 3)
-    df_monthly = calculate_moving_average(df_monthly, 5)
-    df_monthly = generate_signals(calculate_bollinger_bands(calculate_rsi(df_monthly, 3), 5))
-
-    return df_daily, df_weekly, df_monthly
 
 
 def plot_charts(df):
-    # Line Chart with Moving Averages and Bollinger Bands
     plt.figure(figsize=(12, 6))
     plt.plot(df['Date'], df['LastTradePrice'], label='Price', color='blue')
-    plt.plot(df['Date'], df['MA_3'], label='3-Day MA', color='orange')
-    plt.plot(df['Date'], df['MA_5'], label='5-Day MA', color='green')
+    plt.plot(df['Date'], df['SMA_10'], label='SMA (10)', color='orange')
     plt.fill_between(df['Date'], df['BB_Lower'], df['BB_Upper'], color='gray', alpha=0.3, label='Bollinger Bands')
     plt.legend()
-    plt.title('Stock Price with Moving Averages and Bollinger Bands')
+    plt.title('Stock Price with Technical Indicators')
     plt.xlabel('Date')
     plt.ylabel('Price')
     plt.grid()
     plt.show()
 
-    # RSI Chart
     plt.figure(figsize=(12, 6))
     plt.plot(df['Date'], df['RSI'], label='RSI', color='purple')
     plt.axhline(70, color='red', linestyle='--', label='Overbought (70)')
@@ -128,26 +114,15 @@ def plot_charts(df):
     plt.grid()
     plt.show()
 
-    # Volume and Price Overlay
-    fig, ax1 = plt.subplots(figsize=(12, 6))
-    ax1.bar(df['Date'], df['Volume'], color='gray', alpha=0.5, label='Volume')
-    ax1.set_ylabel('Volume')
-    ax1.set_xlabel('Date')
-    ax2 = ax1.twinx()
-    ax2.plot(df['Date'], df['LastTradePrice'], color='blue', label='Price')
-    ax2.set_ylabel('Price')
-    fig.suptitle('Price and Volume')
-    ax1.legend(loc='upper left')
-    ax2.legend(loc='upper right')
-    plt.show()
+def analyze_data(df):
+    df['RSI'] = calculate_rsi(df['LastTradePrice'])
+    df['Momentum'] = calculate_momentum(df['LastTradePrice'], 10)
+    df['Williams_%R'] = calculate_williams_percent_range(df['LastTradePrice'], df['Max'], df['Min'], 14)
+    df['Stochastic_Oscillator'] = calculate_stochastic_oscillator(df['LastTradePrice'], df['Max'], df['Min'], 14)
+    df['SMA_10'] = calculate_sma(df['LastTradePrice'], 10)
+    df['EMA_10'] = calculate_ema(df['LastTradePrice'], 10)
+    df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = calculate_bollinger_bands(df['LastTradePrice'], 10)
+    df['Ultimate_Oscillator'] = calculate_ultimate_oscillator(df['LastTradePrice'], df['Max'], df['Min'])
 
-    # Candlestick Chart
-    df_candlestick = df[['Date', 'LastTradePrice', 'Max', 'Min']].copy()
-    df_candlestick.columns = ['Date', 'Close', 'High', 'Low']  # Rename columns for mplfinance
-    df_candlestick['Open'] = df_candlestick['Close']  # Add Open column (if missing)
-    df_candlestick.set_index('Date', inplace=True)
-    mpf.plot(df_candlestick, type='candle', style='charles', title='Candlestick Chart', volume=False)
-
-
-
-
+    df = generate_signals(df)
+    return df

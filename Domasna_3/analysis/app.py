@@ -8,15 +8,31 @@ from filters.F3 import filter_3
 from filters.F3 import reformat_number
 from DB import init_createDB, get_last_saved_date, update_data
 import pandas as pd
-from technical_analysis import extend_to_time_frames
 import mplfinance as mpf
 app = Flask(__name__)
+from technical_analysis import plot_charts, generate_signals, calculate_bollinger_bands, calculate_rsi, clean_numeric_column, calculate_sma, calculate_stochastic_oscillator, calculate_ema, calculate_williams_percent_range, calculate_momentum
 
 DATABASE = os.path.join('data', 'stock_data.db')
 
 # Initialize the database
 init_createDB()
 
+def get_stock_data(symbol, start_date, end_date):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    query = """
+        SELECT Date, LastTradePrice, Max, Min, Volume
+        FROM StockData
+        WHERE Symbol = ? AND Date BETWEEN ? AND ?
+        ORDER BY Date DESC
+    """
+    cursor.execute(query, (symbol, start_date, end_date))
+    data = cursor.fetchall()
+    conn.close()
+    return [
+        {'date': row[0], 'last_transaction': row[1], 'max_value': row[2], 'min_value': row[3], 'volume': row[4]}
+        for row in data
+    ]
 
 def get_recommendation_counts(issuer):
     # Query the database to count recommendations for the selected issuer
@@ -221,9 +237,10 @@ LIMIT 10;"""
 @app.route('/analytics/technical-analysis', methods=['GET', 'POST'])
 def technical_analysis():
     """Technical Analysis page using extended logic."""
-    # Fetch available issuers from the database
     data_folder = 'data'
     db_path = os.path.join(data_folder, 'stock_data.db')
+
+    # Fetch available issuers
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT DISTINCT Symbol FROM StockData")
@@ -239,14 +256,16 @@ def technical_analysis():
 
         # Fetch historical data for the selected stock
         conn = sqlite3.connect(db_path)
-        query = """
-            SELECT Date, LastTradePrice, Max, Min, Volume
-            FROM StockData
-            WHERE Symbol = ?
-            ORDER BY Date ASC
-        """
-        historical_data = pd.read_sql_query(query, conn, params=(stock_symbol,))
-        conn.close()
+        try:
+            query = """
+                SELECT Date, LastTradePrice, Max, Min, Volume
+                FROM StockData
+                WHERE Symbol = ?
+                ORDER BY Date ASC
+            """
+            historical_data = pd.read_sql_query(query, conn, params=(stock_symbol,))
+        finally:
+            conn.close()
 
         if historical_data.empty:
             return render_template(
@@ -257,41 +276,145 @@ def technical_analysis():
 
         # Preprocess data
         historical_data['Date'] = pd.to_datetime(historical_data['Date'], format='%m/%d/%Y')
-        historical_data['LastTradePrice'] = historical_data['LastTradePrice'].replace(',', '', regex=True).astype(float)
-        historical_data['Max'] = historical_data['Max'].replace(',', '', regex=True).astype(float)
-        historical_data['Min'] = historical_data['Min'].replace(',', '', regex=True).astype(float)
-        historical_data['Volume'] = historical_data['Volume'].replace(',', '', regex=True).astype(float)
+        numerical_cols = ['LastTradePrice', 'Max', 'Min', 'Volume']
+        for col in numerical_cols:
+            historical_data[col] = historical_data[col].apply(clean_numeric_column)
+
         historical_data = historical_data.sort_values(by='Date').reset_index(drop=True)
 
-        # Extend to timeframes and calculate signals using provided logic
-        df_daily, df_weekly, df_monthly = extend_to_time_frames(historical_data)
+        # Perform calculations for daily indicators
+        historical_data['RSI'] = calculate_rsi(historical_data['LastTradePrice'])
+        historical_data['Momentum'] = calculate_momentum(historical_data['LastTradePrice'], 10)
+        historical_data['Williams_%R'] = calculate_williams_percent_range(
+            historical_data['LastTradePrice'],
+            historical_data['Max'],
+            historical_data['Min'],
+            14
+        )
+        historical_data['Stochastic_Oscillator'] = calculate_stochastic_oscillator(
+            historical_data['LastTradePrice'],
+            historical_data['Max'],
+            historical_data['Min'],
+            14
+        )
+        historical_data['SMA_10'] = calculate_sma(historical_data['LastTradePrice'], 10)
+        historical_data['EMA_10'] = calculate_ema(historical_data['LastTradePrice'], 10)
+        historical_data['BB_MA'], historical_data['BB_Upper'], historical_data['BB_Lower'] = calculate_bollinger_bands(
+            historical_data['LastTradePrice'], 10)
+        historical_data = generate_signals(historical_data)
 
-        # Generate candlestick data for frontend
-        df_candlestick = df_daily[['Date', 'LastTradePrice', 'Max', 'Min']].copy()
+        # Extend to time frames (daily, weekly, monthly)
+        historical_data.set_index('Date', inplace=True)
+
+        # # Weekly and monthly resampling with appropriate aggregations
+        # df_weekly = historical_data.resample('W').agg({
+        #     'LastTradePrice': 'last',
+        #     'Max': 'max',
+        #     'Min': 'min',
+        #     'Volume': 'sum',
+        #     # 'RSI': 'last',
+        #     # 'Momentum': 'last',
+        #     # 'Williams_%R': 'last',
+        #     # 'Stochastic_Oscillator': 'last',
+        #     # 'Final_Signal': 'last'
+        #     'RSI': 'mean',
+        #     'Momentum': 'mean',
+        #     'Williams_%R': 'mean',
+        #     'Stochastic_Oscillator': 'mean'
+        # }).dropna()
+        #
+        # df_monthly = historical_data.resample('M').agg({
+        #     'LastTradePrice': 'last',
+        #     'Max': 'max',
+        #     'Min': 'min',
+        #     'Volume': 'sum',
+        #     # 'RSI': 'last',
+        #     # 'Momentum': 'last',
+        #     # 'Williams_%R': 'last',
+        #     # 'Stochastic_Oscillator': 'last',
+        #     # 'Final_Signal': 'last'
+        #     'RSI': 'mean',
+        #     'Momentum': 'mean',
+        #     'Williams_%R': 'mean',
+        #     'Stochastic_Oscillator': 'mean',
+        # }).dropna()
+        #
+        # # Reset index after resampling
+        # df_weekly.reset_index(inplace=True)
+        # df_monthly.reset_index(inplace=True)
+        #
+        # # Generate signals for weekly and monthly timeframes
+        # df_weekly = generate_signals(df_weekly)
+        # df_monthly = generate_signals(df_monthly)
+
+        # Weekly resampling
+        df_weekly = historical_data.resample('W').agg({
+            'LastTradePrice': 'last',
+            'Max': 'max',
+            'Min': 'min',
+            'Volume': 'sum',
+            'RSI': 'mean',
+            'Momentum': 'mean',
+            'Williams_%R': 'mean',
+            'Stochastic_Oscillator': 'mean'
+        }).dropna()
+
+        if df_weekly.empty:
+            df_weekly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
+            df_weekly['Final_Signal'] = 'Not Sufficient Information'
+        else:
+            df_weekly = generate_signals(df_weekly)
+
+        # Monthly resampling
+        df_monthly = historical_data.resample('M').agg({
+            'LastTradePrice': 'last',
+            'Max': 'max',
+            'Min': 'min',
+            'Volume': 'sum',
+            'RSI': 'mean',
+            'Momentum': 'mean',
+            'Williams_%R': 'mean',
+            'Stochastic_Oscillator': 'mean',
+        }).dropna()
+
+        if df_monthly.empty:
+            df_monthly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
+            df_monthly['Final_Signal'] = 'Not Sufficient Information'
+        else:
+            df_monthly = generate_signals(df_monthly)
+
+        # Reset indices to make them compatible with rendering logic
+        df_weekly.reset_index(inplace=True)
+        df_monthly.reset_index(inplace=True)
+
+        # Generate candlestick data
+        df_candlestick = historical_data[['LastTradePrice', 'Max', 'Min']].reset_index()
         df_candlestick.columns = ['date', 'close', 'high', 'low']
-        df_candlestick['open'] = df_candlestick['close']  # Add Open column
+        df_candlestick['open'] = df_candlestick['close']
         candlestick_data = df_candlestick.to_dict(orient='records')
 
-        # Plot the candlestick chart and save it
+        # Plot candlestick chart
         df_candlestick.set_index('date', inplace=True)
         chart_filename = f"candlestick_{stock_symbol}.png"
         chart_path = os.path.join('static', 'charts', chart_filename)
-        mpf.plot(df_candlestick, type='candle', style='charles', title=f'Candlestick Chart for {stock_symbol}', volume=False, savefig=chart_path)
+        mpf.plot(df_candlestick, type='candle', style='charles', title=f'Candlestick Chart for {stock_symbol}',
+                 volume=False, savefig=chart_path)
 
-        # Final signals
+        # Extract signals for rendering
         final_signals = {
-            "daily": df_daily[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
+            "daily": historical_data.reset_index()[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(
+                orient='records'),
             "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
             "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records')
         }
 
     return render_template(
-        'technical_analysis.html',
-        issuers=issuers,
-        candlestick_data=candlestick_data,
-        selected_symbol=stock_symbol if request.method == 'POST' else None,
-        chart_path=chart_path,
-        final_signals=final_signals
+            'technical_analysis.html',
+            issuers=issuers,
+            candlestick_data=candlestick_data,
+            selected_symbol=stock_symbol if request.method == 'POST' else None,
+            chart_path=chart_path,
+            final_signals=final_signals
     )
 
 
