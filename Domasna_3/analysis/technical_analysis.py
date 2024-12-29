@@ -114,15 +114,35 @@ def plot_charts(df):
     plt.grid()
     plt.show()
 
+
+# def analyze_data(df):
+#     df['RSI'] = calculate_rsi(df['LastTradePrice'])
+#     df['Momentum'] = calculate_momentum(df['LastTradePrice'], 10)
+#     df['Williams_%R'] = calculate_williams_percent_range(df['LastTradePrice'], df['Max'], df['Min'], 14)
+#     df['Stochastic_Oscillator'] = calculate_stochastic_oscillator(df['LastTradePrice'], df['Max'], df['Min'], 14)
+#     df['SMA_10'] = calculate_sma(df['LastTradePrice'], 10)
+#     df['SMA_20'] = calculate_sma(df['LastTradePrice'], 20)  # New Indicator
+#     df['EMA_10'] = calculate_ema(df['LastTradePrice'], 10)
+#     df['EMA_50'] = calculate_ema(df['LastTradePrice'], 50)  # New Indicator
+#     df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = calculate_bollinger_bands(df['LastTradePrice'], 10)
+#     df['Ultimate_Oscillator'] = calculate_ultimate_oscillator(df['LastTradePrice'], df['Max'], df['Min'])
+#
+#     df = generate_signals(df)
+#   return df
 def analyze_data(df):
     df['RSI'] = calculate_rsi(df['LastTradePrice'])
     df['Momentum'] = calculate_momentum(df['LastTradePrice'], 10)
     df['Williams_%R'] = calculate_williams_percent_range(df['LastTradePrice'], df['Max'], df['Min'], 14)
     df['Stochastic_Oscillator'] = calculate_stochastic_oscillator(df['LastTradePrice'], df['Max'], df['Min'], 14)
     df['SMA_10'] = calculate_sma(df['LastTradePrice'], 10)
+    df['SMA_20'] = calculate_sma(df['LastTradePrice'], 20)  # New SMA
+    df['SMA_50'] = calculate_sma(df['LastTradePrice'], 50)  # New SMA
     df['EMA_10'] = calculate_ema(df['LastTradePrice'], 10)
+    df['EMA_20'] = calculate_ema(df['LastTradePrice'], 20)  # New EMA
+    df['EMA_50'] = calculate_ema(df['LastTradePrice'], 50)  # New EMA
     df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = calculate_bollinger_bands(df['LastTradePrice'], 10)
     df['Ultimate_Oscillator'] = calculate_ultimate_oscillator(df['LastTradePrice'], df['Max'], df['Min'])
 
     df = generate_signals(df)
     return df
+

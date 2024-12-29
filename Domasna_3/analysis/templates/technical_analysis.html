@@ -50,12 +50,17 @@
         <div>
             <h4>Daily Signals</h4>
             {% if final_signals.daily and final_signals.daily|length > 0 %}
-            <table>
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Price</th>
                         <th>Signal</th>
+                        <th>RSI</th>
+                        <th>Momentum</th>
+                        <th>Stochastic Oscillator</th>
+                        <th>SMA (10)</th>
+                        <th>EMA (10)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -63,7 +68,12 @@
                     <tr>
                         <td>{{ signal['Date'] }}</td>
                         <td>{{ signal['LastTradePrice'] }}</td>
-                        <td>{{ signal['Final_Signal'] }}</td>
+                        <td class="recommendation">{{ signal['Final_Signal'] }}</td>
+                        <td>{{ signal['RSI'] }}</td>
+                        <td>{{ signal['Momentum'] }}</td>
+                        <td>{{ signal['Stochastic_Oscillator'] }}</td>
+                        <td>{{ signal['SMA_10'] }}</td>
+                        <td>{{ signal['EMA_10'] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -76,12 +86,17 @@
         <div>
             <h4>Weekly Signals</h4>
             {% if final_signals.weekly and final_signals.weekly|length > 0 %}
-            <table>
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Price</th>
                         <th>Signal</th>
+                        <th>RSI</th>
+                        <th>Momentum</th>
+                        <th>Stochastic Oscillator</th>
+                        <th>SMA (10)</th>
+                        <th>EMA (10)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,7 +104,12 @@
                     <tr>
                         <td>{{ signal['Date'] }}</td>
                         <td>{{ signal['LastTradePrice'] }}</td>
-                        <td>{{ signal['Final_Signal'] }}</td>
+                        <td class="recommendation">{{ signal['Final_Signal'] }}</td>
+                        <td>{{ signal['RSI'] }}</td>
+                        <td>{{ signal['Momentum'] }}</td>
+                        <td>{{ signal['Stochastic_Oscillator'] }}</td>
+                        <td>{{ signal['SMA_10'] }}</td>
+                        <td>{{ signal['EMA_10'] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -102,12 +122,17 @@
         <div>
             <h4>Monthly Signals</h4>
             {% if final_signals.monthly and final_signals.monthly|length > 0 %}
-            <table>
+            <table class="styled-table">
                 <thead>
                     <tr>
                         <th>Date</th>
                         <th>Price</th>
                         <th>Signal</th>
+                        <th>RSI</th>
+                        <th>Momentum</th>
+                        <th>Stochastic Oscillator</th>
+                        <th>SMA (10)</th>
+                        <th>EMA (10)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -115,7 +140,12 @@
                     <tr>
                         <td>{{ signal['Date'] }}</td>
                         <td>{{ signal['LastTradePrice'] }}</td>
-                        <td>{{ signal['Final_Signal'] }}</td>
+                        <td class="recommendation">{{ signal['Final_Signal'] }}</td>
+                        <td>{{ signal['RSI'] }}</td>
+                        <td>{{ signal['Momentum'] }}</td>
+                        <td>{{ signal['Stochastic_Oscillator'] }}</td>
+                        <td>{{ signal['SMA_10'] }}</td>
+                        <td>{{ signal['EMA_10'] }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

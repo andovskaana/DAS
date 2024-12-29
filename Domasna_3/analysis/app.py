@@ -358,6 +358,16 @@ def technical_analysis():
         # df_monthly = generate_signals(df_monthly)
 
         # Weekly resampling
+        # df_weekly = historical_data.resample('W').agg({
+        #     'LastTradePrice': 'last',
+        #     'Max': 'max',
+        #     'Min': 'min',
+        #     'Volume': 'sum',
+        #     'RSI': 'mean',
+        #     'Momentum': 'mean',
+        #     'Williams_%R': 'mean',
+        #     'Stochastic_Oscillator': 'mean'
+        # }).dropna()
         df_weekly = historical_data.resample('W').agg({
             'LastTradePrice': 'last',
             'Max': 'max',
@@ -366,7 +376,9 @@ def technical_analysis():
             'RSI': 'mean',
             'Momentum': 'mean',
             'Williams_%R': 'mean',
-            'Stochastic_Oscillator': 'mean'
+            'Stochastic_Oscillator': 'mean',
+            'SMA_10': 'mean',
+            'EMA_10': 'mean'
         }).dropna()
 
         if df_weekly.empty:
@@ -376,6 +388,16 @@ def technical_analysis():
             df_weekly = generate_signals(df_weekly)
 
         # Monthly resampling
+        # df_monthly = historical_data.resample('M').agg({
+        #     'LastTradePrice': 'last',
+        #     'Max': 'max',
+        #     'Min': 'min',
+        #     'Volume': 'sum',
+        #     'RSI': 'mean',
+        #     'Momentum': 'mean',
+        #     'Williams_%R': 'mean',
+        #     'Stochastic_Oscillator': 'mean',
+        # }).dropna()
         df_monthly = historical_data.resample('M').agg({
             'LastTradePrice': 'last',
             'Max': 'max',
@@ -385,6 +407,8 @@ def technical_analysis():
             'Momentum': 'mean',
             'Williams_%R': 'mean',
             'Stochastic_Oscillator': 'mean',
+            'SMA_10': 'mean',
+            'EMA_10': 'mean'
         }).dropna()
 
         if df_monthly.empty:
@@ -410,12 +434,25 @@ def technical_analysis():
         mpf.plot(df_candlestick, type='candle', style='charles', title=f'Candlestick Chart for {stock_symbol}',
                  volume=False, savefig=chart_path)
 
-        # Extract signals for rendering
+        # # Extract signals for rendering
+        # final_signals = {
+        #     "daily": historical_data.reset_index()[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(
+        #         orient='records'),
+        #     "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
+        #     "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records')
+        # }
+        # Extended `final_signals` to include additional values:
         final_signals = {
-            "daily": historical_data.reset_index()[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(
+            "daily": historical_data.reset_index()[[
+                'Date', 'LastTradePrice', 'Final_Signal', 'RSI',
+                'Momentum', 'Stochastic_Oscillator', 'SMA_10', 'EMA_10'
+            ]].tail().to_dict(orient='records'),
+            "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI',
+                                 'Momentum', 'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(
                 orient='records'),
-            "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
-            "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records')
+            "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI',
+                                   'Momentum', 'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(
+                orient='records')
         }
 
     return render_template(
