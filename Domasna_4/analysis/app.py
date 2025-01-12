@@ -193,32 +193,86 @@ def dashboard():
 
     return render_template('dashboard.html', stocks=stocks)
 
-
-@app.route('/technical-analysis', methods=['POST'])
+@app.route('/analytics/technical-analysis', methods=['GET'])
 def technical_analysis():
-    """Calls the technical analysis microservice"""
-    symbol = request.form.get('symbol')
+    symbols = get_symbols()
+
+    return render_template(
+        'technical_analysis.html',
+        issuers=symbols,
+        candlestick_data=None,
+        selected_symbol= None,
+        chart_path=None,
+        final_signals=None
+    )
+
+@app.route('/analytics/technical-analysis', methods=['POST'])
+def technical_analysis_post():
+    symbols = get_symbols()  # Retrieve available stock symbols for the dropdown
+    selected_symbol = request.form.get('symbol')
     start_date = request.form.get('start_date')
     end_date = request.form.get('end_date')
 
+    # Handle case when no symbol is selected
+    if not selected_symbol:
+        return render_template(
+            'technical_analysis.html',
+            issuers=symbols,
+            candlestick_data=None,
+            selected_symbol=None,
+            chart_path=None,
+            final_signals=None,
+            error="Please select a stock symbol."
+        )
+
     # Prepare the payload for the API request
     payload = {
-        "symbol": symbol,
+        "symbol": selected_symbol,  # Adjust key to match expected API payload
         "start_date": start_date,
         "end_date": end_date
     }
 
-    # Call the technical analysis service
-    response = requests.post('http://localhost:5001/api/technical-analysis', json=payload)
+    try:
+        # Call the technical analysis service
+        response = requests.post('http://localhost:5001/api/technical_analysis',  json={"symbol": selected_symbol})
 
-    if response.status_code == 200:
-        analysis_data = response.json()
-        return render_template('technical_analysis.html', analysis_data=analysis_data)
-    else:
-        return render_template('technical_analysis.html', error="Failed to fetch technical analysis data")
+        if response.status_code == 200:
+            # Parse the API response
+            analysis_data = response.json()
 
+            return render_template(
+                'technical_analysis.html',
+                issuers=symbols,
+                candlestick_data=analysis_data.get('candlestick_data'),
+                selected_symbol=selected_symbol,
+                chart_path=analysis_data.get('chart_path'),
+                final_signals=analysis_data.get('final_signals'),
+                error=None
+            )
+        else:
+            # Handle API error response
+            return render_template(
+                'technical_analysis.html',
+                issuers=symbols,
+                candlestick_data=None,
+                selected_symbol=selected_symbol,
+                chart_path=None,
+                final_signals=None,
+                error="Failed to fetch technical analysis data. Please try again later."
+            )
 
-#
+    except requests.exceptions.RequestException as e:
+        # Handle connection errors or other request exceptions
+        return render_template(
+            'technical_analysis.html',
+            issuers=symbols,
+            candlestick_data=None,
+            selected_symbol=selected_symbol,
+            chart_path=None,
+            final_signals=None,
+            error=f"An error occurred while contacting the analysis service: {str(e)}"
+        )
+
 @app.route('/analytics/fundamental-analysis', methods=['GET'])
 def fundamental_analysis():
     issuers = get_issuers()
@@ -247,24 +301,16 @@ def get_fundamental_data():
 def lstm():
     symbols = get_symbols()
 
-    predicted_price = None
-    graph_path = None
-    recommendation = None
-    error_message = None
-    metrics = None
-    selected_symbol = None
-
     return render_template(
         'lstm.html',
         issuers=symbols,
-        predicted_price=predicted_price,
-        recommendation=recommendation,
-        graph_path=graph_path,
-        metrics=metrics,
-        error_message=error_message,
-        selected_symbol=selected_symbol
+        predicted_price=None,
+        recommendation=None,
+        graph_path=None,
+        metrics=None,
+        error_message=None,
+        selected_symbol=None
     )
-
 
 def get_symbols():
     conn = sqlite3.connect(DATABASE)

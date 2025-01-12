@@ -12,7 +12,7 @@
     <nav>
         <ul>
             <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-            <li><a href="#">Analytics</a>
+            <li>
                 <ul>
                     <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
                     <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
@@ -32,12 +32,12 @@
     <!-- Form for selecting stock symbol -->
     <form method="POST" action="{{ url_for('lstm') }}" onsubmit="showSpinner()">
         <label for="symbol">Select Stock Symbol:</label>
-        <select name="symbol" id="symbol">
+        <select name="symbol" id="symbol" class="search-bar">>
             {% for issuer in issuers %}
                 <option value="{{ issuer }}" {% if issuer == selected_symbol %}selected{% endif %}>{{ issuer }}</option>
             {% endfor %}
         </select>
-        <button type="submit">Predict</button>
+        <button type="submit" class="notification-icon">Predict</button>
     </form>
 
     <!-- Spinner -->
