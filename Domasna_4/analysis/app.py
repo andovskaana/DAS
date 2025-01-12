@@ -12,7 +12,6 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
-from lstm import train_and_predict
 
 DATABASE = os.path.join('data', 'stock_data.db')
 
@@ -35,45 +34,6 @@ def get_stock_data(symbol, start_date, end_date):
         {'date': row[0], 'last_transaction': row[1], 'max_value': row[2], 'min_value': row[3], 'volume': row[4]}
         for row in data
     ]
-
-def get_recommendation_counts(issuer):
-    # Query the database to count recommendations for the selected issuer
-    conn = sqlite3.connect('data/stock_data.db')  # Replace with your database
-    cursor = conn.cursor()
-    cursor.execute("""
-            SELECT 'buy' AS recommendation, COUNT(*) 
-            FROM all_info 
-            WHERE issuer = ? AND recommendation = 'buy'
-            UNION
-            SELECT 'sell' AS recommendation, COUNT(*) 
-            FROM all_info 
-            WHERE issuer = ? AND recommendation = 'sell'
-            UNION
-            SELECT 'hold' AS recommendation, COUNT(*) 
-            FROM all_info 
-            WHERE issuer = ? AND recommendation = 'hold'
-        """, (issuer, issuer, issuer))
-    results = cursor.fetchall()
-    conn.close()
-
-    # Process the results into a dictionary
-    counts = {"Buy": 0, "Sell": 0, "Hold": 0}
-    for recommendation, count in results:
-        recommendation = recommendation.capitalize()  # Converts 'hold' to 'Hold'
-        if recommendation in counts:
-            counts[recommendation] = count
-
-    if counts["Buy"] > counts["Sell"]:
-        recommendation = "Buy"
-    elif counts["Sell"] > counts["Buy"]:
-        recommendation = "Sell"
-    else:
-        recommendation = "Hold"
-
-    return {**counts, "Recommendation": recommendation}
-
-    # return counts
-
 
 def get_issuers():
     # Connect to your database and fetch issuer names
@@ -264,14 +224,6 @@ def fundamental_analysis():
     issuers = get_issuers()
     return render_template('fundamental_analysis.html', issuers=issuers)
 
-# @app.route('/analytics/fundamental-analysis', methods=['POST'])
-# def get_fundamental_data():
-#     issuer_name = request.json.get('issuer')
-#     if issuer_name:
-#         data = get_recommendation_counts(issuer_name)
-#         return jsonify(data)
-#     return jsonify({})
-
 @app.route('/analytics/fundamental-analysis', methods=['POST'])
 def get_fundamental_data():
     issuer_name = request.json.get('issuer')
@@ -291,47 +243,20 @@ def get_fundamental_data():
             logging.error(f"Error contacting microservice: {e}")
             return jsonify({"error": str(e)}), 500
 
-
-# @app.route('/analytics/lstm')
-# def lstm():
-#     """LSTM page."""
-#     return render_template('lstm.html')
-
-@app.route('/analytics/lstm', methods=['GET', 'POST'])
+@app.route('/analytics/lstm', methods=['GET'])
 def lstm():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT Symbol FROM StockData")
-    issuers = [row[0] for row in cursor.fetchall()]
-    conn.close()
+    symbols = get_symbols()
 
     predicted_price = None
-    last_prices = None
     graph_path = None
     recommendation = None
     error_message = None
     metrics = None
     selected_symbol = None
 
-    if request.method == 'POST':
-        selected_symbol = request.form.get('symbol')
-        predicted_price, last_prices, metrics, graph_path = train_and_predict(selected_symbol)
-
-        if predicted_price is not None and last_prices is not None:
-            last_price = last_prices[-1]
-            if predicted_price > last_price * 1.05:
-                recommendation = "Sell"
-            elif predicted_price < last_price * 0.95:
-                recommendation = "Buy"
-            else:
-                recommendation = "Hold"
-        else:
-            error_message = "Not enough data for prediction."
-            recommendation = "Hold"
-
     return render_template(
         'lstm.html',
-        issuers=issuers,
+        issuers=symbols,
         predicted_price=predicted_price,
         recommendation=recommendation,
         graph_path=graph_path,
@@ -339,6 +264,107 @@ def lstm():
         error_message=error_message,
         selected_symbol=selected_symbol
     )
+
+
+def get_symbols():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT Symbol FROM StockData")
+    issuers = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return issuers
+
+
+@app.route('/analytics/lstm', methods=['POST'])
+def lstm_post():
+    symbols = get_symbols()
+
+    # Default values
+    predicted_price = None
+    last_prices = None
+    graph_path = None
+    recommendation = None
+    error_message = None
+    metrics = None
+
+    selected_symbol = request.form.get('symbol')
+    if not selected_symbol:
+        return render_template(
+            'lstm.html',
+            issuers=symbols,
+            predicted_price=predicted_price,
+            recommendation=recommendation,
+            graph_path=graph_path,
+            metrics=metrics,
+            error_message="Symbol not provided",
+            selected_symbol=selected_symbol
+        )
+    try:
+        # Call the LSTM microservice
+        response = requests.post(
+            'http://localhost:5004/api/lstm',
+            json={"symbol": selected_symbol}
+        )
+        logging.debug(f"LSTM microservice response: {response.status_code}, {response.text}")
+
+        if response.status_code == 200:
+            data = response.json()
+            # Parse the response data
+            predicted_price = data.get('predicted_price')
+            last_prices = data.get('last_prices')
+            metrics = data.get('metrics')
+            graph_path = data.get('graph_path')
+
+            # To ensure that metrics are in proper format
+            if not isinstance(metrics, list) or len(metrics) != 2:
+                metrics = [None, None]
+
+            if predicted_price is not None and last_prices:
+                last_price = last_prices[-1]
+                if predicted_price > last_price * 1.05:
+                    recommendation = "Sell"
+                elif predicted_price < last_price * 0.95:
+                    recommendation = "Buy"
+                else:
+                    recommendation = "Hold"
+            else:
+                recommendation = "Hold"
+                error_message = "Not enough data for prediction."
+
+            return render_template(
+                'lstm.html',
+                issuers=symbols,
+                predicted_price=predicted_price,
+                recommendation=recommendation,
+                graph_path=graph_path,
+                metrics=metrics,
+                error_message=error_message,
+                selected_symbol=selected_symbol
+            )
+        else:
+            logging.error(f"Failed to fetch data from the LSTM service: {response.status_code}")
+            return render_template(
+                'lstm.html',
+                issuers=symbols,
+                predicted_price=predicted_price,
+                recommendation=recommendation,
+                graph_path=graph_path,
+                metrics=metrics,
+                error_message="Failed to fetch data from the LSTM service ",
+                selected_symbol=selected_symbol
+            )
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error contacting LSTM service: {e}")
+        return render_template(
+            'lstm.html',
+            issuers=symbols,
+            predicted_price=predicted_price,
+            recommendation=recommendation,
+            graph_path=graph_path,
+            metrics=metrics,
+            error_message="Failed to establish a new connection",
+            selected_symbol=selected_symbol
+        )
 
 if __name__ == '__main__':
     app.run(debug=True)

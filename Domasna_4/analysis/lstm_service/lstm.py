@@ -10,7 +10,7 @@ import sqlite3
 import os
 import matplotlib.pyplot as plt
 
-DATABASE = 'data/stock_data.db'
+DATABASE = '../data/stock_data.db'
 
 def preprocess_data(symbol):
     conn = sqlite3.connect(DATABASE)
@@ -82,15 +82,13 @@ def train_and_predict(symbol, time_step=60):
     next_price_scaled = model.predict(last_data)
     next_price = scaler.inverse_transform(
         np.concatenate((next_price_scaled, np.zeros((next_price_scaled.shape[0], 2))), axis=1)
-    )[:, 0]
+    )[:, 0].tolist()
 
-    last_prices = scaler.inverse_transform(scaled_data[-time_step:, :3])[:, 0]
+    last_prices = scaler.inverse_transform(scaled_data[-time_step:, :3])[:, 0].tolist()
 
     graph_path = generate_graph(last_prices, next_price[0], symbol)
 
-    return next_price[0], last_prices, {'mse': mse, 'rmse': rmse}, graph_path
-
-
+    return float(next_price[0]), last_prices, [mse, rmse], graph_path
 
 def generate_graph(last_prices, predicted_price, symbol):
     plt.figure(figsize=(10, 6))
@@ -103,7 +101,7 @@ def generate_graph(last_prices, predicted_price, symbol):
     plt.legend()
     plt.grid(True)
 
-    graph_path = os.path.join("static", "graphs", f"{symbol}_prediction.png")
+    graph_path = os.path.join("../static", "graphs", f"{symbol}_prediction.png")
     os.makedirs(os.path.dirname(graph_path), exist_ok=True)
     plt.savefig(graph_path)
     plt.close()

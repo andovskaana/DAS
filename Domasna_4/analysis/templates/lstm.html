@@ -30,7 +30,7 @@
     </header>
 
     <!-- Form for selecting stock symbol -->
-    <form method="POST" action="{{ url_for('lstm') }}">
+    <form method="POST" action="{{ url_for('lstm') }}" onsubmit="showSpinner()">
         <label for="symbol">Select Stock Symbol:</label>
         <select name="symbol" id="symbol">
             {% for issuer in issuers %}
@@ -40,13 +40,24 @@
         <button type="submit">Predict</button>
     </form>
 
+    <!-- Spinner -->
+    <div class="spinner-overlay" id="spinner">
+        <div class="spinner"></div>
+        <p id="spinner-message" style="display: none; color: white; margin-top: 20px;">This is taking longer than expected...</p>
+    </div>
     <!-- Section for displaying prediction results -->
     {% if predicted_price %}
-        <div class="results">
+        <div class="metrics-container">
             <h2>Prediction Results for {{ selected_symbol }}</h2>
-            <p><strong>Predicted Next Price:</strong> {{ predicted_price | round(2) }}</p>
+            <div class="metric">
+                <span class="metric-label">Predicted Next Price:</span>
+                <span class="metric-value">{{ predicted_price | round(2) }}</span>
+            </div>
             {% if recommendation %}
-                <p><strong>Recommendation:</strong> {{ recommendation }}</p>
+            <div class="metric">
+                <span class="metric-label">Recommendation:</span>
+                <span class="metric-value">{{ recommendation }}</span>
+            </div>
             {% endif %}
         </div>
     {% endif %}
@@ -54,10 +65,16 @@
 
     <!-- Section for displaying validation metrics -->
     {% if metrics %}
-        <div class="metrics">
+        <div class="metrics-container">
             <h2>Validation Metrics</h2>
-            <p><strong>Mean Squared Error (MSE):</strong> {{ metrics.mse | round(4) }}</p>
-            <p><strong>Root Mean Squared Error (RMSE):</strong> {{ metrics.rmse | round(4) }}</p>
+            <div class="metric">
+                <span class="metric-label">Mean Squared Error (MSE): </span>
+                <span class="metric-value"> {{ metrics[0] | round(4) if metrics[0] is not none else 'Not available' }}</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Root Mean Squared Error (RMSE): </span>
+                <span class="metric-value"> {{ metrics[1] | round(4) if metrics[1] is not none else 'Not available' }}</span>
+            </div>
         </div>
     {% endif %}
 
@@ -70,15 +87,37 @@
     {% endif %}
 
     <!-- Section for displaying error messages -->
-    {% if error_message %}
-        <div class="error">
+   {% if error_message %}
+        <div class="metrics-container">
             <h2>Prediction Error</h2>
-            <p>{{ error_message }}</p>
+            <div class="metric">
+                <span class="metric-label">Error Message: </span>
+                <span class="metric-value"> {{ error_message }}</span>
+            </div>
             {% if recommendation %}
-                <p><strong>Recommendation:</strong> {{ recommendation }}</p>
+            <div class="metric">
+                <span class="metric-label">Recommendation: </span>
+                <span class="metric-value"> {{ recommendation }}</span>
+            </div>
             {% endif %}
         </div>
     {% endif %}
 </div>
+<script>
+    function showSpinner() {
+    const spinner = document.getElementById('spinner');
+    const spinnerMessage = document.getElementById('spinner-message');
+
+    // Show the spinner
+    spinner.style.display = 'flex';
+
+    // Show the message after 5 seconds if the spinner is still visible
+    setTimeout(() => {
+        if (spinner.style.display === 'flex') {
+            spinnerMessage.style.display = 'block';
+        }
+    }, 15000);
+}
+</script>
 </body>
 </html>
