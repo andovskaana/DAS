@@ -1,0 +1,9 @@
+POST http://localhost:5001/api/technical_analysis
+Content-Type: application/json
+
+{
+  "symbol": "ALK"
+}
+
+
+
