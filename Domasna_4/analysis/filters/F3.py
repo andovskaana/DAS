@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 import csv
 
-from Domasna_3.analysis.DB import update_last_date, insert_stock_data
+from Domasna_4.analysis.DB import update_last_date, insert_stock_data
 
 async def fetch_data_for_dates(session, issuer_code, start_date, end_date):
     """Fetch data for a specific issuer between start and end dates in 365-day increments."""
