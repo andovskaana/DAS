@@ -10,13 +10,16 @@ import sqlite3
 import os
 import matplotlib.pyplot as plt
 
-DATABASE = '../data/stock_data.db'
+from Domasna_4.analysis.DB import DatabaseConnection
+
 
 def preprocess_data(symbol):
-    conn = sqlite3.connect(DATABASE)
+    #Use Singleton to get the shared database connection
+    db = DatabaseConnection().get_connection()
     query = f"SELECT Date, Max, Min, Volume FROM StockData WHERE Symbol='{symbol}'"
-    data = pd.read_sql(query, conn)
-    conn.close()
+    data = pd.read_sql(query, db)
+    if data.empty:
+        return None, None
 
     # Convert Date column to datetime
     data['Date'] = pd.to_datetime(data['Date'], errors='coerce')

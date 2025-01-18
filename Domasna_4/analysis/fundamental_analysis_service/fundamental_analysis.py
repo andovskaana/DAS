@@ -10,6 +10,9 @@ import os
 from playwright.sync_api import sync_playwright
 import csv
 
+from Domasna_4.analysis.DB import DatabaseConnection
+
+
 def save_issuers_to_csv(issuers, file_name='issuers.csv'):
     """Save the issuers dictionary to a CSV file."""
     with open(file_name, mode='w', newline='') as file:
@@ -100,38 +103,30 @@ def get_default_date_from():
 
 def get_last_scraped_date(issuer):
     """Get the last scraped date from the database for a specific issuer."""
-    db_path = '../data/stock_data.db'
     default_date_from = get_default_date_from()
 
-    # Check if database exists
-    if not os.path.exists(db_path):
-        print(f"Database {db_path} does not exist.")
-        return default_date_from
+    db = DatabaseConnection().get_connection()
+    cursor = db.cursor()
+    try:
+        # Check if `all_info` table exists
+        cursor.execute("""
+            SELECT name FROM sqlite_master WHERE type='table' AND name='all_info';
+        """)
+        table_exists = cursor.fetchone()
+        if not table_exists:
+            print("Table 'all_info' does not exist in the database.")
+            return default_date_from
 
-    connection = sqlite3.connect(db_path)
-    cursor = connection.cursor()
+        # Fetch the last_scraped_date for the issuer
+        cursor.execute("""
+            SELECT last_scraped_date FROM all_info WHERE issuer = ?;
+        """, (issuer,))
+        last_scraped_date = cursor.fetchone()
 
-    # Check if `all_info` table exists
-    cursor.execute("""
-        SELECT name FROM sqlite_master WHERE type='table' AND name='all_info';
-    """)
-    table_exists = cursor.fetchone()
-
-    if not table_exists:
-        print("Table 'all_info' does not exist in the database.")
-        connection.close()
-        return default_date_from
-
-    # Fetch the last_scraped_date for the issuer
-    cursor.execute("""
-        SELECT last_scraped_date FROM all_info WHERE issuer = ?;
-    """, (issuer,))
-    last_scraped_date = cursor.fetchone()
-
-    # Check the result of the query
-    print(f"Query result for issuer {issuer}: {last_scraped_date}")
-
-    connection.close()
+        # Check the result of the query
+        print(f"Query result for issuer {issuer}: {last_scraped_date}")
+    finally:
+        cursor.close()
 
     # Return last scraped date if exists, otherwise default date
     if last_scraped_date:
@@ -148,31 +143,29 @@ def get_last_scraped_date(issuer):
 
 def update_last_scraped_date(issuer, scrape_date):
     """Update the last scraped date in the database."""
-    db_path = '../data/stock_data.db'
-    connection = sqlite3.connect(db_path)
-    cursor = connection.cursor()
+    db = DatabaseConnection().get_connection()
+    cursor = db.cursor()
+    try:
+        # Check if the issuer already exists in the table
+        cursor.execute("SELECT COUNT(*) FROM all_info WHERE issuer = ?", (issuer,))
+        row_count = cursor.fetchone()[0]
 
-    # Check if the issuer already exists in the table
-    cursor.execute("SELECT COUNT(*) FROM all_info WHERE issuer = ?", (issuer,))
-    row_count = cursor.fetchone()[0]
-
-    if row_count > 0:
-        # If the issuer exists, update the last scraped date
-        cursor.execute("""
-            UPDATE all_info
-            SET last_scraped_date = ?
-            WHERE issuer = ?
-        """, (scrape_date, issuer))
-    else:
-        # If the issuer doesn't exist, insert a new record
-        cursor.execute("""
-            INSERT INTO all_info (issuer, last_scraped_date)
-            VALUES (?, ?)
-        """, (issuer, scrape_date))
-
-    connection.commit()
-    connection.close()
-
+        if row_count > 0:
+            # If the issuer exists, update the last scraped date
+            cursor.execute("""
+                UPDATE all_info
+                SET last_scraped_date = ?
+                WHERE issuer = ?
+            """, (scrape_date, issuer))
+        else:
+            # If the issuer doesn't exist, insert a new record
+            cursor.execute("""
+                INSERT INTO all_info (issuer, last_scraped_date)
+                VALUES (?, ?)
+            """, (issuer, scrape_date))
+        db.commit()
+    finally:
+        cursor.close()
 
 issuers = load_issuers_from_csv()
 if not issuers:  # If issuers are empty, scrape and save them
@@ -197,38 +190,37 @@ def get_issuer_name_from_csv(issuer_id, csv_file_path = 'issuers.csv'):
 
 # Database setup
 def setup_database():
-    connection = sqlite3.connect('../data/stock_data.db')  # Connect to stock_data.db
-    cursor = connection.cursor()
-
-    cursor.execute('''
-         CREATE TABLE IF NOT EXISTS all_info (
-             issuer TEXT,
-             recommendation TEXT,
-             last_scraped_date TEXT
-         )
-     ''')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS recommendations (
-            issuer TEXT PRIMARY KEY,
-            current_recommendation TEXT
-        )
-    ''')
-
-    connection.commit()
-    connection.close()
-
+    db = DatabaseConnection().get_connection()
+    cursor = db.cursor()
+    try:
+        cursor.execute('''
+             CREATE TABLE IF NOT EXISTS all_info (
+                 issuer TEXT,
+                 recommendation TEXT,
+                 last_scraped_date TEXT
+             )
+         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS recommendations (
+                issuer TEXT PRIMARY KEY,
+                current_recommendation TEXT
+            )
+        ''')
+        db.commit()
+    finally:
+        cursor.close()
 
 def save_to_database(table, data):
-    connection = sqlite3.connect('../data/stock_data.db')  # Connect to stock_data.db
-    cursor = connection.cursor()
-
-    if table == 'all_info':
-        cursor.execute('INSERT INTO all_info (issuer, recommendation, last_scraped_date) VALUES (?, ?, ?)', data)
-    elif table == 'recommendations':
-        cursor.execute('INSERT OR REPLACE INTO recommendations (issuer, current_recommendation) VALUES (?, ?)', data)
-
-    connection.commit()
-    connection.close()
+    db = DatabaseConnection().get_connection()
+    cursor = db.cursor()
+    try:
+        if table == 'all_info':
+            cursor.execute('INSERT INTO all_info (issuer, recommendation, last_scraped_date) VALUES (?, ?, ?)', data)
+        elif table == 'recommendations':
+            cursor.execute('INSERT OR REPLACE INTO recommendations (issuer, current_recommendation) VALUES (?, ?)', data)
+        db.commit()
+    finally:
+        cursor.close()
 
 
 async def fetch_attachment(session, attachment_id, issuer, last_scraped_date, file_name, attachment_ids_map):
@@ -336,26 +328,25 @@ async def fetch_all_issuer_documents(session, issuer_ids):
 
 
 def calculate_final_recommendations():
-    connection = sqlite3.connect('../data/stock_data.db')
-    cursor = connection.cursor()
-
+    db = DatabaseConnection().get_connection()
+    cursor = db.cursor()
     # Fetch all sentiments grouped by issuer
     cursor.execute("SELECT issuer, recommendation FROM all_info")
     rows = cursor.fetchall()
+    try:
+        # Group recommendations by issuer
+        issuer_sentiments = defaultdict(list)
+        for issuer, sentiment in rows:
+            issuer_sentiments[issuer].append(sentiment)
 
-    # Group recommendations by issuer
-    issuer_sentiments = defaultdict(list)
-    for issuer, sentiment in rows:
-        issuer_sentiments[issuer].append(sentiment)
+        # Calculate the most common sentiment for each issuer
+        for issuer, sentiments in issuer_sentiments.items():
+            most_common_sentiment = Counter(sentiments).most_common(1)[0][0]
 
-    # Calculate the most common sentiment for each issuer
-    for issuer, sentiments in issuer_sentiments.items():
-        most_common_sentiment = Counter(sentiments).most_common(1)[0][0]
-
-        # Save the final sentiment to the recommendations table
-        # save_to_database('recommendations', (issuer, most_common_sentiment))
-
-    connection.close()
+            # Save the final sentiment to the recommendations table
+            # save_to_database('recommendations', (issuer, most_common_sentiment))
+    finally:
+        cursor.close()
 
 
 # Main function remains unchanged

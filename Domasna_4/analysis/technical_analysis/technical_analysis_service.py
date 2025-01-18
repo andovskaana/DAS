@@ -4,6 +4,8 @@ import pandas as pd
 import mplfinance as mpf
 
 from flask import Flask, jsonify, request
+
+from Domasna_4.analysis.DB import DatabaseConnection, test_database_connection
 from technical_analysis import plot_charts, generate_signals, calculate_bollinger_bands, calculate_rsi, clean_numeric_column, calculate_sma, calculate_stochastic_oscillator, calculate_ema, calculate_williams_percent_range, calculate_momentum
 
 app = Flask(__name__)
@@ -15,9 +17,7 @@ def technical_analysis():
     if not symbol:
         return jsonify({"error": "Symbol not provided"}), 400
     try:
-        data_folder = '../data'
-        db_path = os.path.join(data_folder, 'stock_data.db')
-        historical_data = get_historical_data(db_path, symbol)
+        historical_data = get_historical_data(symbol)
         result = process_historical_data(historical_data, symbol)
 
         return jsonify(result)
@@ -25,19 +25,16 @@ def technical_analysis():
         return jsonify({"error": str(e)}), 500
 
 
-def get_historical_data(db_path, stock_symbol):
-    # Fetch historical data for the selected stock
-    conn = sqlite3.connect(db_path)
-    try:
-        query = """
-                SELECT Date, LastTradePrice, Max, Min, Volume
-                FROM StockData
-                WHERE Symbol = ?
-                ORDER BY Date ASC
-            """
-        historical_data = pd.read_sql_query(query, conn, params=(stock_symbol,))
-    finally:
-        conn.close()
+def get_historical_data(stock_symbol):
+    #Use Singleton to get the shared database connection
+    db = DatabaseConnection().get_connection()
+    query = """
+            SELECT Date, LastTradePrice, Max, Min, Volume
+            FROM StockData
+            WHERE Symbol = ?
+            ORDER BY Date ASC
+        """
+    historical_data = pd.read_sql_query(query, db, params=(stock_symbol,))
     return historical_data
 
 def process_historical_data(historical_data, stock_symbol):
@@ -88,43 +85,48 @@ def process_historical_data(historical_data, stock_symbol):
         historical_data['LastTradePrice'], 10
     )
     historical_data = generate_signals(historical_data)
-
     # Resample data for weekly and monthly signals
     historical_data.set_index('Date', inplace=True)
-
-    # Weekly resampling
-    df_weekly = historical_data.resample('W').agg({
-        'LastTradePrice': 'last',
-        'Max': 'max',
-        'Min': 'min',
-        'Volume': 'sum',
-        'RSI': 'mean',
-        'Momentum': 'mean',
-        'Williams_%R': 'mean',
-        'Stochastic_Oscillator': 'mean',
-        'SMA_10': 'mean',
-        'EMA_10': 'mean'
-    }).dropna()
+    try:
+        # Weekly resampling
+        df_weekly = historical_data.resample('W').agg({
+            'LastTradePrice': 'last',
+            'Max': 'max',
+            'Min': 'min',
+            'Volume': 'sum',
+            'RSI': 'mean',
+            'Momentum': 'mean',
+            'Williams_%R': 'mean',
+            'Stochastic_Oscillator': 'mean',
+            'SMA_10': 'mean',
+            'EMA_10': 'mean'
+        }).dropna()
+    except Exception as e:
+        df_weekly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
+        df_weekly['Final_Signal'] = 'Not Sufficient Information'
 
     if df_weekly.empty:
         df_weekly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
         df_weekly['Final_Signal'] = 'Not Sufficient Information'
     else:
         df_weekly = generate_signals(df_weekly)
-
+    try:
     # Monthly resampling
-    df_monthly = historical_data.resample('ME').agg({
-        'LastTradePrice': 'last',
-        'Max': 'max',
-        'Min': 'min',
-        'Volume': 'sum',
-        'RSI': 'mean',
-        'Momentum': 'mean',
-        'Williams_%R': 'mean',
-        'Stochastic_Oscillator': 'mean',
-        'SMA_10': 'mean',
-        'EMA_10': 'mean'
-    }).dropna()
+        df_monthly = historical_data.resample('ME').agg({
+            'LastTradePrice': 'last',
+            'Max': 'max',
+            'Min': 'min',
+            'Volume': 'sum',
+            'RSI': 'mean',
+            'Momentum': 'mean',
+            'Williams_%R': 'mean',
+            'Stochastic_Oscillator': 'mean',
+            'SMA_10': 'mean',
+            'EMA_10': 'mean'
+        }).dropna()
+    except Exception as e:
+        df_monthly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
+        df_monthly['Final_Signal'] = 'Not Sufficient Information'
 
     if df_monthly.empty:
         df_monthly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
@@ -170,4 +172,5 @@ def process_historical_data(historical_data, stock_symbol):
     }
 
 if __name__ == '__main__':
+    test_database_connection()
     app.run(port=5001)

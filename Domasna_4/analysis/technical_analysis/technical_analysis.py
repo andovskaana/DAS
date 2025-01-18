@@ -12,11 +12,11 @@ def clean_numeric_column(value):
         try:
             return float(value.replace('.', '').replace(',', '.'))
         except ValueError:
-            return np.nan
+            return 0
     elif isinstance(value, (int, float)):
         return value  # Already numeric
     else:
-        return np.nan
+        return 0
 
 def calculate_rsi(data, window=14):
     delta = data.diff()
@@ -24,33 +24,33 @@ def calculate_rsi(data, window=14):
     loss = -delta.where(delta < 0, 0).rolling(window=window).mean()
     rs = gain / loss
     rsi = 100 - (100 / (1 + rs))
-    return rsi
+    return rsi.fillna(0)
 
 def calculate_momentum(data, window):
-    return (data - data.shift(window)) / data.shift(window) * 100
+    return ((data - data.shift(window)) / data.shift(window) * 100).fillna(0)
 
 def calculate_williams_percent_range(data, high, low, window):
     highest_high = high.rolling(window=window).max()
     lowest_low = low.rolling(window=window).min()
-    return -100 * (highest_high - data) / (highest_high - lowest_low)
+    return (-100 * (highest_high - data) / (highest_high - lowest_low)).fillna(0)
 
 def calculate_stochastic_oscillator(data, high, low, window):
     highest_high = high.rolling(window=window).max()
     lowest_low = low.rolling(window=window).min()
-    return 100 * (data - lowest_low) / (highest_high - lowest_low)
+    return (100 * (data - lowest_low) / (highest_high - lowest_low)).fillna(0)
 
 def calculate_sma(data, window):
-    return data.rolling(window=window).mean()
+    return (data.rolling(window=window).mean()).fillna(0)
 
 def calculate_ema(data, window):
-    return data.ewm(span=window, adjust=False).mean()
+    return (data.ewm(span=window, adjust=False).mean()).fillna(0)
 
 def calculate_bollinger_bands(data, window):
     sma = calculate_sma(data, window)
     std_dev = data.rolling(window=window).std()
     upper_band = sma + (2 * std_dev)
     lower_band = sma - (2 * std_dev)
-    return sma, upper_band, lower_band
+    return sma.fillna(0), upper_band.fillna(0), lower_band.fillna(0)
 
 def calculate_ultimate_oscillator(data, high, low, window1=7, window2=14, window3=28):
     buying_pressure = data - low
@@ -61,7 +61,7 @@ def calculate_ultimate_oscillator(data, high, low, window1=7, window2=14, window
     avg3 = buying_pressure.rolling(window=window3).sum() / true_range.rolling(window=window3).sum()
 
     ultimate_oscillator = 100 * ((4 * avg1) + (2 * avg2) + avg3) / 7
-    return ultimate_oscillator
+    return ultimate_oscillator.fillna(0)
 
 def generate_signals(df):
     # Check if required columns exist

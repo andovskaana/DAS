@@ -7,44 +7,15 @@ import asyncio
 from filters.F1 import filter_1
 from filters.F3 import filter_3
 from filters.F3 import reformat_number
-from DB import init_createDB, get_last_saved_date, update_data
+from DB import init_createDB, get_last_saved_date, update_data, fetch_issuers, extract_issuer_rows, retrieve_top_10, \
+    DatabaseConnection, fetch_symbols
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
-DATABASE = os.path.join('data', 'stock_data.db')
-
 # Initialize the database
 init_createDB()
-
-def get_stock_data(symbol, start_date, end_date):
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    query = """
-        SELECT Date, LastTradePrice, Max, Min, Volume
-        FROM StockData
-        WHERE Symbol = ? AND Date BETWEEN ? AND ?
-        ORDER BY Date DESC
-    """
-    cursor.execute(query, (symbol, start_date, end_date))
-    data = cursor.fetchall()
-    conn.close()
-    return [
-        {'date': row[0], 'last_transaction': row[1], 'max_value': row[2], 'min_value': row[3], 'volume': row[4]}
-        for row in data
-    ]
-
-def get_issuers():
-    # Connect to your database and fetch issuer names
-    conn = sqlite3.connect('data/stock_data.db')  # Replace with your database
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT issuer FROM recommendations")  # Assuming `issuers` table exists
-    issuers = cursor.fetchall()
-    conn.close()
-    return issuers
-
-
 
 def rescrape_and_update_data():
     """Rescrape data and update the database."""
@@ -78,6 +49,11 @@ def rescrape_and_update_data():
 
     print("Rescraping process completed.")
 
+# @app.teardown_appcontext
+# def close_db_connection(exception=None):
+#     """Close the database connection on application teardown."""
+#     DatabaseConnection().close_connection()
+#     print("Database connection closed.")
 
 @app.route('/')
 def index():
@@ -86,62 +62,12 @@ def index():
     from_date = request.args.get('from_date', '')
     to_date = request.args.get('to_date', '')
     issuer = request.args.get('issuer', 'ALL')
-
     # Rescrape and update the database
     rescrape_and_update_data()
-
     # Fetch issuers for the dropdown
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT Symbol FROM StockData")
-    issuers = [row[0] for row in cursor.fetchall()]
-    conn.close()
-
+    issuers = fetch_symbols()
     # Build query based on filters
-    query = """
-        SELECT * 
-        FROM StockData 
-        WHERE 1=1
-    """
-    params = []
-
-    if from_date:
-        query += """
-        AND CAST(SUBSTR(Date, -4, 4) || '-' ||
-                 printf('%02d', CAST(SUBSTR(Date, 1, INSTR(Date, '/') - 1) AS INTEGER)) || '-' ||
-                 printf('%02d', CAST(SUBSTR(Date, INSTR(Date, '/') + 1, LENGTH(Date) - INSTR(Date, '/')) AS INTEGER))
-             AS TEXT) >= ?
-        """
-        params.append(from_date)
-
-    if to_date:
-        query += """
-        AND CAST(SUBSTR(Date, -4, 4) || '-' ||
-                 printf('%02d', CAST(SUBSTR(Date, 1, INSTR(Date, '/') - 1) AS INTEGER)) || '-' ||
-                 printf('%02d', CAST(SUBSTR(Date, INSTR(Date, '/') + 1, LENGTH(Date) - INSTR(Date, '/')) AS INTEGER))
-             AS TEXT) <= ?
-        """
-        params.append(to_date)
-
-    if issuer != "ALL":
-        query += " AND Symbol = ?"
-        params.append(issuer)
-
-    # Add ORDER BY clause to sort by date
-    query += """
-    ORDER BY CAST(SUBSTR(Date, -4, 4) || '-' ||
-                  printf('%02d', CAST(SUBSTR(Date, 1, INSTR(Date, '/') - 1) AS INTEGER)) || '-' ||
-                  printf('%02d', CAST(SUBSTR(Date, INSTR(Date, '/') + 1, LENGTH(Date) - INSTR(Date, '/')) AS INTEGER))
-              AS TEXT) DESC
-    """
-
-    # Fetch filtered rows from the database
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-
+    rows = extract_issuer_rows(from_date, issuer, to_date)
     # Render the template with fetched data
     return render_template(
         'index.html',
@@ -154,48 +80,14 @@ def index():
 
 @app.route('/dashboard')
 def dashboard():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-
-    # Find the latest date in the database
-    latest_date_query = """
-    SELECT Date 
-    FROM StockData
-    ORDER BY CAST(SUBSTR(Date, 7, 4) || SUBSTR(Date, 1, 2) || SUBSTR(Date, 4, 2) AS INTEGER) DESC
-    LIMIT 1
-    """
-    cursor.execute(latest_date_query)
-    latest_date = cursor.fetchone()
-    latest_date = latest_date[0] if latest_date else None
-
-    if not latest_date:
-        # No data in the database
-        stocks = []
-    else:
-        # Retrieve the top 10 most tradeable stocks
-        query = """
-        SELECT 
-            Symbol, 
-            AvgPrice,
-            PercentageChange,
-            CAST(REPLACE(Volume, '.', '') AS INTEGER) AS DailyTotalVolume,
-            TotalTurnover
-        FROM StockData
-        WHERE Date = ?
-        ORDER BY DailyTotalVolume DESC
-        LIMIT 10
-        """
-        cursor.execute(query, (latest_date,))
-        stocks = cursor.fetchall()
-
-    conn.close()
+    stocks = retrieve_top_10()
     print(stocks)  # Debugging output to verify fetched data
-
     return render_template('dashboard.html', stocks=stocks)
+
 
 @app.route('/analytics/technical-analysis', methods=['GET'])
 def technical_analysis():
-    symbols = get_symbols()
+    symbols = fetch_symbols()
 
     return render_template(
         'technical_analysis.html',
@@ -208,7 +100,7 @@ def technical_analysis():
 
 @app.route('/analytics/technical-analysis', methods=['POST'])
 def technical_analysis_post():
-    symbols = get_symbols()  # Retrieve available stock symbols for the dropdown
+    symbols = fetch_symbols()  # Retrieve available stock symbols for the dropdown
     selected_symbol = request.form.get('symbol')
     start_date = request.form.get('start_date')
     end_date = request.form.get('end_date')
@@ -275,7 +167,7 @@ def technical_analysis_post():
 
 @app.route('/analytics/fundamental-analysis', methods=['GET'])
 def fundamental_analysis():
-    issuers = get_issuers()
+    issuers = fetch_issuers()
     return render_template('fundamental_analysis.html', issuers=issuers)
 
 @app.route('/analytics/fundamental-analysis', methods=['POST'])
@@ -299,7 +191,7 @@ def get_fundamental_data():
 
 @app.route('/analytics/lstm', methods=['GET'])
 def lstm():
-    symbols = get_symbols()
+    symbols = fetch_symbols()
 
     return render_template(
         'lstm.html',
@@ -312,18 +204,10 @@ def lstm():
         selected_symbol=None
     )
 
-def get_symbols():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT Symbol FROM StockData")
-    issuers = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return issuers
-
 
 @app.route('/analytics/lstm', methods=['POST'])
 def lstm_post():
-    symbols = get_symbols()
+    symbols = fetch_symbols()
 
     # Default values
     predicted_price = None
