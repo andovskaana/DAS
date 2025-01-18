@@ -2,7 +2,7 @@ import requests
 from flask import Flask, render_template, request, jsonify
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 from filters.F1 import filter_1
 from filters.F3 import filter_3
@@ -59,8 +59,8 @@ def rescrape_and_update_data():
 def index():
     """Home page displaying stock data with filtering options."""
     # Fetch query parameters for filters
-    from_date = request.args.get('from_date', '')
-    to_date = request.args.get('to_date', '')
+    from_date = request.args.get('from_date', (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d'))
+    to_date = request.args.get('to_date', datetime.now().strftime('%Y-%m-%d'))
     issuer = request.args.get('issuer', 'ALL')
     # Rescrape and update the database
     rescrape_and_update_data()

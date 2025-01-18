@@ -158,4 +158,7 @@ table.styled-table tbody tr:hover {
     margin-left: 5px;
     text-align: left;
 }
+.hidden {
+        display: none;
+    }
 
