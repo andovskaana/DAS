@@ -2,31 +2,16 @@ from flask import Flask, request, jsonify
 import sqlite3
 import os
 
+from Domasna_4.analysis.DB import DatabaseConnection, test_database_connection
+
 app = Flask(__name__)
-
-DATABASE = '../data/stock_data.db'
-
-
-def test_database_connection():
-    """Check if the database connection is successful at startup."""
-    try:
-        if not os.path.exists(DATABASE):
-            raise FileNotFoundError(f"Database file not found at {DATABASE}")
-
-        conn = sqlite3.connect(DATABASE)
-        conn.execute("SELECT 1")  # Test a simple query
-        conn.close()
-        print("Database connection successful.")
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        raise
-
 
 def get_recommendation_counts(issuer):
     """Fetch recommendation counts from the database."""
     try:
-        conn = sqlite3.connect(DATABASE)
-        cursor = conn.cursor()
+        #Use Singleton to get the shared database connection  #Use Singleton to get the shared database connection
+        db = DatabaseConnection().get_connection()
+        cursor = db.cursor()
         cursor.execute("""
             SELECT 'buy' AS recommendation, COUNT(*) 
             FROM all_info 
@@ -41,7 +26,7 @@ def get_recommendation_counts(issuer):
             WHERE issuer = ? AND recommendation = 'hold'
         """, (issuer, issuer, issuer))
         results = cursor.fetchall()
-        conn.close()
+        cursor.close()
     except sqlite3.Error as db_error:
         raise Exception(f"Database query error: {db_error}")
     except Exception as e:

@@ -25,7 +25,7 @@
     </div>
     <div class="main-content">
         <header>
-            <input type="text" placeholder="Search for stocks and more" class="search-bar">
+            <input type="text" placeholder="Search by symbol" id="search-input" class="search-bar" oninput="filterTable()">
             <span class="notification-icon">🔔</span>
         </header>
         <h2>Historical Data</h2>
@@ -53,7 +53,7 @@
         </form>
 
         <!-- Data Table -->
-        <table class="styled-table">
+        <table class="styled-table" id="data-table">
             <thead>
                 <tr>
                     <th>Symbol</th>
@@ -69,6 +69,7 @@
                 </tr>
             </thead>
             <tbody>
+            {% if rows %}
                 {% for row in rows %}
                 <tr>
                     <td>{{ row[0] }}</td>
@@ -83,8 +84,33 @@
                     <td>{{ row[9] }}</td>
                 </tr>
                 {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center;">No data for selected period</td>
+                </tr>
+            {% endif %}
             </tbody>
         </table>
     </div>
+
+ <script>
+    function filterTable() {
+        const input = document.getElementById('search-input').value.toUpperCase(); // Get the input value and convert to uppercase
+        const table = document.getElementById('data-table');
+        const rows = table.getElementsByTagName('tr'); // Get all table rows
+
+        for (let i = 1; i < rows.length; i++) { // Start from index 1 to skip the header row
+            const symbolCell = rows[i].getElementsByTagName('td')[0]; // Get the first column (Symbol)
+            if (symbolCell) {
+                const symbolText = symbolCell.textContent || symbolCell.innerText;
+                if (symbolText.toUpperCase().indexOf(input) > -1) {
+                    rows[i].classList.remove('hidden'); // Show row if it matches the search
+                } else {
+                    rows[i].classList.add('hidden'); // Hide row if it doesn't match
+                }
+            }
+        }
+    }
+</script>
 </body>
 </html>
