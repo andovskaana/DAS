@@ -1,0 +1,9 @@
+POST http://localhost:5004/api/lstm
+Content-Type: application/json
+
+{
+  "symbol": "ALK"
+}
+
+
+

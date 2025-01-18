@@ -1,0 +1,8 @@
+POST http://localhost:5002/api/fundamental-analysis
+Content-Type: application/json
+
+{
+  "issuer": "Alkaloid AD Skopje"
+}
+
+

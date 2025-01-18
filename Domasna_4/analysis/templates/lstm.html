@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSTM Prediction</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="sidebar">
+    <h2>StockApp</h2>
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+            <li>
+                <ul>
+                    <li><a href="{{ url_for('technical_analysis') }}">Technical Analysis</a></li>
+                    <li><a href="{{ url_for('fundamental_analysis') }}">Fundamental Analysis</a></li>
+                    <li><a href="{{ url_for('lstm') }}" class="active">LSTM</a></li>
+                </ul>
+            </li>
+            <li><a href="{{ url_for('index') }}">Historical Data</a></li>
+        </ul>
+    </nav>
+</div>
+
+<div class="main-content">
+    <header>
+        <h1>LSTM Prediction</h1>
+    </header>
+
+    <!-- Form for selecting stock symbol -->
+    <form method="POST" action="{{ url_for('lstm') }}" onsubmit="showSpinner()">
+        <label for="symbol">Select Stock Symbol:</label>
+        <select name="symbol" id="symbol" class="search-bar">>
+            {% for issuer in issuers %}
+                <option value="{{ issuer }}" {% if issuer == selected_symbol %}selected{% endif %}>{{ issuer }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="notification-icon">Predict</button>
+    </form>
+
+    <!-- Spinner -->
+    <div class="spinner-overlay" id="spinner">
+        <div class="spinner"></div>
+        <p id="spinner-message" style="display: none; color: white; margin-top: 20px;">This is taking longer than expected...</p>
+    </div>
+    <!-- Section for displaying prediction results -->
+    {% if predicted_price %}
+        <div class="metrics-container">
+            <h2>Prediction Results for {{ selected_symbol }}</h2>
+            <div class="metric">
+                <span class="metric-label">Predicted Next Price:</span>
+                <span class="metric-value">{{ predicted_price | round(2) }}</span>
+            </div>
+            {% if recommendation %}
+            <div class="metric">
+                <span class="metric-label">Recommendation:</span>
+                <span class="metric-value">{{ recommendation }}</span>
+            </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+
+    <!-- Section for displaying validation metrics -->
+    {% if metrics %}
+        <div class="metrics-container">
+            <h2>Validation Metrics</h2>
+            <div class="metric">
+                <span class="metric-label">Mean Squared Error (MSE): </span>
+                <span class="metric-value"> {{ metrics[0] | round(4) if metrics[0] is not none else 'Not available' }}</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Root Mean Squared Error (RMSE): </span>
+                <span class="metric-value"> {{ metrics[1] | round(4) if metrics[1] is not none else 'Not available' }}</span>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Prediction Graph -->
+    {% if graph_path %}
+        <div class="results">
+            <h2>Prediction Graph</h2>
+            <img src="/{{ graph_path }}" alt="Price Prediction Graph">
+        </div>
+    {% endif %}
+
+    <!-- Section for displaying error messages -->
+   {% if error_message %}
+        <div class="metrics-container">
+            <h2>Prediction Error</h2>
+            <div class="metric">
+                <span class="metric-label">Error Message: </span>
+                <span class="metric-value"> {{ error_message }}</span>
+            </div>
+            {% if recommendation %}
+            <div class="metric">
+                <span class="metric-label">Recommendation: </span>
+                <span class="metric-value"> {{ recommendation }}</span>
+            </div>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+<script>
+    function showSpinner() {
+    const spinner = document.getElementById('spinner');
+    const spinnerMessage = document.getElementById('spinner-message');
+
+    // Show the spinner
+    spinner.style.display = 'flex';
+
+    // Show the message after 5 seconds if the spinner is still visible
+    setTimeout(() => {
+        if (spinner.style.display === 'flex') {
+            spinnerMessage.style.display = 'block';
+        }
+    }, 15000);
+}
+</script>
+</body>
+</html>
