@@ -101,7 +101,9 @@ def process_historical_data(historical_data, stock_symbol):
         'RSI': 'mean',
         'Momentum': 'mean',
         'Williams_%R': 'mean',
-        'Stochastic_Oscillator': 'mean'
+        'Stochastic_Oscillator': 'mean',
+        'SMA_10': 'mean',
+        'EMA_10': 'mean'
     }).dropna()
 
     if df_weekly.empty:
@@ -111,7 +113,7 @@ def process_historical_data(historical_data, stock_symbol):
         df_weekly = generate_signals(df_weekly)
 
     # Monthly resampling
-    df_monthly = historical_data.resample('M').agg({
+    df_monthly = historical_data.resample('ME').agg({
         'LastTradePrice': 'last',
         'Max': 'max',
         'Min': 'min',
@@ -120,6 +122,8 @@ def process_historical_data(historical_data, stock_symbol):
         'Momentum': 'mean',
         'Williams_%R': 'mean',
         'Stochastic_Oscillator': 'mean',
+        'SMA_10': 'mean',
+        'EMA_10': 'mean'
     }).dropna()
 
     if df_monthly.empty:
@@ -147,12 +151,16 @@ def process_historical_data(historical_data, stock_symbol):
     mpf.plot(df_candlestick, type='candle', style='charles', title=f'Candlestick Chart for {stock_symbol}',
              volume=False, savefig=chart_path)
 
-    # Extract signals for rendering
+    # Extended `final_signals` to include additional values:
     final_signals = {
-        "daily": historical_data.reset_index()[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(
-            orient='records'),
-        "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records'),
-        "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal']].tail().to_dict(orient='records')
+        "daily": historical_data.reset_index()[[
+            'Date', 'LastTradePrice', 'Final_Signal', 'RSI',
+            'Momentum', 'Stochastic_Oscillator', 'SMA_10', 'EMA_10'
+        ]].tail().to_dict(orient='records'),
+        "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI', 'Momentum',
+                             'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(orient='records'),
+        "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI', 'Momentum',
+                               'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(orient='records')
     }
 
     return {
