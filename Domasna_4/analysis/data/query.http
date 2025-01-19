@@ -1,0 +1,9 @@
+POST http://localhost:5005/api/db/query
+Content-Type: application/json
+
+{
+  "query": "SELECT Date, Max, Min, Volume FROM StockData WHERE Symbol='ALK'"
+}
+
+
+

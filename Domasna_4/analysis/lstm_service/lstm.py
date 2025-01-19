@@ -6,18 +6,21 @@ from sklearn.metrics import mean_squared_error
 from keras import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.optimizers import Adam
-import sqlite3
-import os
+import requests
 import matplotlib.pyplot as plt
+import os
 
-from Domasna_4.analysis.DB import DatabaseConnection
-
+# Get DB_SERVICE_URL from environment, default to localhost if not set
+DB_SERVICE_URL = os.getenv("DB_SERVICE_URL", "http://localhost:5005/api/db/query")
 
 def preprocess_data(symbol):
-    #Use Singleton to get the shared database connection
-    db = DatabaseConnection().get_connection()
     query = f"SELECT Date, Max, Min, Volume FROM StockData WHERE Symbol='{symbol}'"
-    data = pd.read_sql(query, db)
+    response = requests.post(DB_SERVICE_URL, json={"query": query})
+
+    if response.status_code != 200:
+        raise Exception(f"Database query failed: {response.json().get('error')}")
+
+    data = pd.DataFrame(response.json())
     if data.empty:
         return None, None
 

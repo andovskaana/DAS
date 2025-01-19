@@ -1,18 +1,27 @@
-from flask import Flask, request, jsonify
-import sqlite3
 import os
-
-from Domasna_4.analysis.DB import DatabaseConnection, test_database_connection
+import requests
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
+DB_SERVICE_URL = os.getenv("DB_SERVICE_URL", "http://localhost:5005/api/db/cursor")
+
+def execute_query(query, params=None, fetchone=False):
+    payload = {
+        "query": query,
+        "params": params or [],
+        "fetchone": fetchone
+    }
+    try:
+        response = requests.post(DB_SERVICE_URL, json=payload)
+        response.raise_for_status()
+        return response.json()  # Returns query results as raw tuples
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        return None
 
 def get_recommendation_counts(issuer):
     """Fetch recommendation counts from the database."""
-    try:
-        #Use Singleton to get the shared database connection  #Use Singleton to get the shared database connection
-        db = DatabaseConnection().get_connection()
-        cursor = db.cursor()
-        cursor.execute("""
+    query ="""
             SELECT 'buy' AS recommendation, COUNT(*) 
             FROM all_info 
             WHERE issuer = ? AND recommendation = 'buy'
@@ -24,13 +33,11 @@ def get_recommendation_counts(issuer):
             SELECT 'hold' AS recommendation, COUNT(*) 
             FROM all_info 
             WHERE issuer = ? AND recommendation = 'hold'
-        """, (issuer, issuer, issuer))
-        results = cursor.fetchall()
-        cursor.close()
-    except sqlite3.Error as db_error:
-        raise Exception(f"Database query error: {db_error}")
-    except Exception as e:
-        raise Exception(f"Unexpected error: {e}")
+        """
+    params = [issuer, issuer, issuer]
+
+    data = execute_query(query, params)
+    results = [(item['recommendation'], item['COUNT(*)']) for item in data]
 
     # Process the results into a dictionary
     counts = {"Buy": 0, "Sell": 0, "Hold": 0}
@@ -66,7 +73,6 @@ def analyze_fundamentals():
 
 if __name__ == '__main__':
     try:
-        test_database_connection()  # Test the connection at startup
         app.run(port=5002, debug=True)
     except Exception as e:
         print(f"Failed to start the application: {e}")

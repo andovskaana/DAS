@@ -3,5 +3,3 @@ pandas
 scikit-learn
 flask
 tensorflow
-os
-matplotblib

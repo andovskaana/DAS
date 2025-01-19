@@ -1,12 +1,19 @@
 FROM python:3.10-slim
 
+# Set the working directory inside the container
 WORKDIR /app
 
-COPY . /app
+# Copy application code and dependencies
+COPY ../ /app/Domasna_4
 
-COPY requirements.txt.txt /app/requirements.txt.txt
-RUN pip install --no-cache-dir -r requirements.txt.txt
+# Set the PYTHONPATH to include `/app`, `/app/Domasna_4`, and `/app/Domasna_4/analysis`
+ENV PYTHONPATH="/app:/app/Domasna_4:/app/Domasna_4/analysis"
 
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Expose the application port
 EXPOSE 5001
 
+# Command to run the service
 CMD ["python", "technical_analysis_service.py"]

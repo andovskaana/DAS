@@ -1,8 +1,4 @@
 Flask
-os
 asyncio
 textblob
-io
-collections
 pdfplumber
-csv

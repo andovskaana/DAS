@@ -1,29 +1,40 @@
 version: '3.10'
 
 services:
+  db_service:
+    build:
+      context: ./analysis/data
+    ports:
+      - "5005:5005"
+    volumes:
+      - ./data:/app/database  # Mount the database folder for persistent storage
   technical_analysis:
     build:
-      context: ./analysis/technical_analysis
+      context: ../
+      dockerfile: analysis/technical_analysis/Dockerfile
     ports:
-      - "5001:5000"
+      - "5001:5001"
 
   fundamental_analysis_service:
     build:
-      context: ./analysis/fundamental_analysis_service
+      context: ../
+      dockerfile: analysis/fundamental_analysis_service/Dockerfile
     ports:
-      - "5002:5000"
+      - "5002:5002"
 
 
   lstm_service:
     build:
-      context: ./analysis/lstm_service
+      context: ../../  # Set the build context to the root of the Domasna_4 directory
+      dockerfile: analysis/lstm_service/Dockerfile
     ports:
-      - "5004:5000"
+      - "5004:5004"
 
 
   app:
     build:
-      context: ./analysis  # Points to the directory where app.py and its Dockerfile are
+      context: ./  # Points to the directory where app.py and its Dockerfile are
+      dockerfile: analysis/Dockerfile
     container_name: app
     ports:
       - "5000:5000"  # The app's API should be accessible on this port

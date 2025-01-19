@@ -1,24 +1,25 @@
-import sqlite3
 import os
 
 import numpy as np
 import pandas as pd
-import mplfinance as mpf
+import requests
 
 from flask import Flask, jsonify, request
 
-from Domasna_4.analysis.DB import DatabaseConnection, test_database_connection
-from Domasna_4.analysis.technical_analysis.strategies.rsi import RSIIndicator
-from Domasna_4.analysis.technical_analysis.strategies.momentum import MomentumIndicator
-from Domasna_4.analysis.technical_analysis.strategies.sma import SMAIndicator
-from Domasna_4.analysis.technical_analysis.strategies.ema import EMAIndicator
-from Domasna_4.analysis.technical_analysis.strategies.williams_percent_range import WilliamsPercentRangeIndicator
-from Domasna_4.analysis.technical_analysis.strategies.bollinger_bands import BollingerBandsIndicator
-from Domasna_4.analysis.technical_analysis.strategies.stochastic_oscillator import StochasticOscillatorIndicator
-from Domasna_4.analysis.technical_analysis.technical_analysis import TechnicalAnalysisContext
-from Domasna_4.analysis.technical_analysis.visualisation import generate_candlestick_data
+from strategies.rsi import RSIIndicator
+from strategies.momentum import MomentumIndicator
+from strategies.sma import SMAIndicator
+from strategies.ema import EMAIndicator
+from strategies.williams_percent_range import WilliamsPercentRangeIndicator
+from strategies.bollinger_bands import BollingerBandsIndicator
+from strategies.stochastic_oscillator import StochasticOscillatorIndicator
+from technical_analysis import TechnicalAnalysisContext
+from visualisation import generate_candlestick_data
 
 app = Flask(__name__)
+# Get DB_SERVICE_URL from environment, default to localhost if not set
+DB_SERVICE_URL = os.getenv("DB_SERVICE_URL", "http://localhost:5005/api/db/query")
+
 
 @app.route('/api/technical_analysis', methods=['POST'])
 def technical_analysis():
@@ -36,16 +37,16 @@ def technical_analysis():
 
 
 def get_historical_data(stock_symbol):
-    #Use Singleton to get the shared database connection
-    db = DatabaseConnection().get_connection()
-    query = """
-            SELECT Date, LastTradePrice, Max, Min, Volume
-            FROM StockData
-            WHERE Symbol = ?
-            ORDER BY Date ASC
-        """
-    historical_data = pd.read_sql_query(query, db, params=(stock_symbol,))
+    query = f"SELECT Date, LastTradePrice, Max, Min, Volume FROM StockData WHERE Symbol = '{stock_symbol}' ORDER BY Date ASC"
+    response = requests.post(DB_SERVICE_URL, json={"query": query})
+
+    if response.status_code != 200:
+        raise Exception(f"Database query failed: {response.json().get('error')}")
+
+    historical_data = pd.DataFrame(response.json())
+
     return historical_data
+
 
 def initialize_strategy_context():
     # Initialize the strategy context
@@ -58,6 +59,7 @@ def initialize_strategy_context():
     context.add_strategy('BollingerBands', BollingerBandsIndicator())
     context.add_strategy('StochasticOscillator', StochasticOscillatorIndicator())
     return context
+
 
 def process_historical_data(historical_data, stock_symbol):
     """
@@ -182,6 +184,7 @@ def clean_numeric_column(value):
     else:
         return 0
 
+
 def generate_signals(df):
     # Check if required columns exist
     required_columns = ['RSI', 'Momentum', 'Williams_%R', 'Stochastic_Oscillator']
@@ -195,9 +198,9 @@ def generate_signals(df):
                                 np.where(df['RSI'] > 70, 'Sell', 'Hold'))
     df['Momentum_Signal'] = np.where(df['Momentum'] > 0, 'Buy', 'Sell')
     df['WPR_Signal'] = np.where(df['Williams_%R'] < -80, 'Buy',
-                                 np.where(df['Williams_%R'] > -20, 'Sell', 'Hold'))
+                                np.where(df['Williams_%R'] > -20, 'Sell', 'Hold'))
     df['Stochastic_Signal'] = np.where(df['Stochastic_Oscillator'] < 20, 'Buy',
-                                        np.where(df['Stochastic_Oscillator'] > 80, 'Sell', 'Hold'))
+                                       np.where(df['Stochastic_Oscillator'] > 80, 'Sell', 'Hold'))
 
     # Safely compute the mode for Final_Signal
     signal_mode = df[['RSI_Signal', 'Momentum_Signal', 'WPR_Signal', 'Stochastic_Signal']].mode(axis=1)
@@ -208,10 +211,12 @@ def generate_signals(df):
 
     return df
 
+
 def analyze_data(df, context):
     # Apply the strategies
     df['RSI'] = context.execute_strategy('RSI', df['LastTradePrice'])
-    df['Momentum'] = context.execute_strategy('SMA', df['LastTradePrice'].diff(), window=10)  # Assuming momentum uses SMA logic
+    df['Momentum'] = context.execute_strategy('SMA', df['LastTradePrice'].diff(),
+                                              window=10)  # Assuming momentum uses SMA logic
     df['Williams_%R'] = context.execute_strategy(
         'Williams',
         df['LastTradePrice'],
@@ -237,7 +242,8 @@ def analyze_data(df, context):
     df['EMA_10'] = context.execute_strategy('EMA', df['LastTradePrice'], window=10)
     df['EMA_20'] = context.execute_strategy('EMA', df['LastTradePrice'], window=20)
     df['EMA_50'] = context.execute_strategy('EMA', df['LastTradePrice'], window=50)
-    df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = context.execute_strategy('BollingerBands', df['LastTradePrice'], window=10)
+    df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = context.execute_strategy('BollingerBands', df['LastTradePrice'],
+                                                                           window=10)
 
     # Ultimate Oscillator calculation (not part of the strategies yet)
     df['Ultimate_Oscillator'] = (df['LastTradePrice'] - df['Min']) / (df['Max'] - df['Min'])  # Placeholder logic
@@ -248,7 +254,5 @@ def analyze_data(df, context):
     return df
 
 
-
 if __name__ == '__main__':
-    test_database_connection()
     app.run(port=5001)

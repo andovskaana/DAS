@@ -1,0 +1,11 @@
+POST http://localhost:5005/api/db/cursor
+Content-Type: application/json
+
+{
+  "query": "SELECT 'buy' AS recommendation, COUNT(*) FROM all_info WHERE issuer = ? AND recommendation = 'buy' UNION SELECT 'sell' AS recommendation, COUNT(*) FROM all_info WHERE issuer = ? AND recommendation = 'sell' UNION SELECT 'hold' AS recommendation, COUNT(*) FROM all_info WHERE issuer = ? AND recommendation = 'hold'",
+  "params":  ["Alkaloid AD Skopje", "Alkaloid AD Skopje", "Alkaloid AD Skopje"],
+  "fetchone": false
+}
+
+
+
