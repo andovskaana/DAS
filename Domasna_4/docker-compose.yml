@@ -1,0 +1,34 @@
+version: '3.10'
+
+services:
+  technical_analysis:
+    build:
+      context: ./analysis/technical_analysis
+    ports:
+      - "5001:5000"
+
+  fundamental_analysis_service:
+    build:
+      context: ./analysis/fundamental_analysis_service
+    ports:
+      - "5002:5000"
+
+
+  lstm_service:
+    build:
+      context: ./analysis/lstm_service
+    ports:
+      - "5004:5000"
+
+
+  app:
+    build:
+      context: ./analysis  # Points to the directory where app.py and its Dockerfile are
+    container_name: app
+    ports:
+      - "5000:5000"  # The app's API should be accessible on this port
+    depends_on:
+      - technical_analysis
+      - fundamental_analysis_service
+      - lstm_service
+
