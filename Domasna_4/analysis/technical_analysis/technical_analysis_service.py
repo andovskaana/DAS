@@ -1,12 +1,22 @@
 import sqlite3
 import os
+
+import numpy as np
 import pandas as pd
 import mplfinance as mpf
 
 from flask import Flask, jsonify, request
 
 from Domasna_4.analysis.DB import DatabaseConnection, test_database_connection
-from technical_analysis import plot_charts, generate_signals, calculate_bollinger_bands, calculate_rsi, clean_numeric_column, calculate_sma, calculate_stochastic_oscillator, calculate_ema, calculate_williams_percent_range, calculate_momentum
+from Domasna_4.analysis.technical_analysis.strategies.rsi import RSIIndicator
+from Domasna_4.analysis.technical_analysis.strategies.momentum import MomentumIndicator
+from Domasna_4.analysis.technical_analysis.strategies.sma import SMAIndicator
+from Domasna_4.analysis.technical_analysis.strategies.ema import EMAIndicator
+from Domasna_4.analysis.technical_analysis.strategies.williams_percent_range import WilliamsPercentRangeIndicator
+from Domasna_4.analysis.technical_analysis.strategies.bollinger_bands import BollingerBandsIndicator
+from Domasna_4.analysis.technical_analysis.strategies.stochastic_oscillator import StochasticOscillatorIndicator
+from Domasna_4.analysis.technical_analysis.technical_analysis import TechnicalAnalysisContext
+from Domasna_4.analysis.technical_analysis.visualisation import generate_candlestick_data
 
 app = Flask(__name__)
 
@@ -37,6 +47,18 @@ def get_historical_data(stock_symbol):
     historical_data = pd.read_sql_query(query, db, params=(stock_symbol,))
     return historical_data
 
+def initialize_strategy_context():
+    # Initialize the strategy context
+    context = TechnicalAnalysisContext()
+    context.add_strategy('RSI', RSIIndicator())
+    context.add_strategy('Momentum', MomentumIndicator())
+    context.add_strategy('SMA', SMAIndicator())
+    context.add_strategy('EMA', EMAIndicator())
+    context.add_strategy('Williams', WilliamsPercentRangeIndicator())
+    context.add_strategy('BollingerBands', BollingerBandsIndicator())
+    context.add_strategy('StochasticOscillator', StochasticOscillatorIndicator())
+    return context
+
 def process_historical_data(historical_data, stock_symbol):
     """
     Processes historical stock data to generate candlestick data, chart path, and final signals.
@@ -64,26 +86,37 @@ def process_historical_data(historical_data, stock_symbol):
 
     historical_data = historical_data.sort_values(by='Date').reset_index(drop=True)
 
-    # Perform calculations for daily indicators
-    historical_data['RSI'] = calculate_rsi(historical_data['LastTradePrice'])
-    historical_data['Momentum'] = calculate_momentum(historical_data['LastTradePrice'], 10)
-    historical_data['Williams_%R'] = calculate_williams_percent_range(
-        historical_data['LastTradePrice'],
-        historical_data['Max'],
-        historical_data['Min'],
-        14
-    )
-    historical_data['Stochastic_Oscillator'] = calculate_stochastic_oscillator(
-        historical_data['LastTradePrice'],
-        historical_data['Max'],
-        historical_data['Min'],
-        14
-    )
-    historical_data['SMA_10'] = calculate_sma(historical_data['LastTradePrice'], 10)
-    historical_data['EMA_10'] = calculate_ema(historical_data['LastTradePrice'], 10)
-    historical_data['BB_MA'], historical_data['BB_Upper'], historical_data['BB_Lower'] = calculate_bollinger_bands(
-        historical_data['LastTradePrice'], 10
-    )
+    # Apply strategies for indicators
+    context = initialize_strategy_context()
+    # Analyze data using the strategies
+    historical_data = analyze_data(historical_data, context)
+
+    # Generate signals (if not already generated in analyze_data)
+    df_monthly, df_weekly, historical_data = resample_data(historical_data)
+
+    # Generate candlestick data
+    candlestick_data, chart_path = generate_candlestick_data(historical_data, stock_symbol)
+
+    # Extended `final_signals` to include additional values:
+    final_signals = {
+        "daily": historical_data.reset_index()[[
+            'Date', 'LastTradePrice', 'Final_Signal', 'RSI',
+            'Momentum', 'Stochastic_Oscillator', 'SMA_10', 'EMA_10'
+        ]].tail().to_dict(orient='records'),
+        "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI', 'Momentum',
+                             'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(orient='records'),
+        "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI', 'Momentum',
+                               'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(orient='records')
+    }
+
+    return {
+        "candlestick_data": candlestick_data,
+        "chart_path": chart_path,
+        "final_signals": final_signals
+    }
+
+
+def resample_data(historical_data):
     historical_data = generate_signals(historical_data)
     # Resample data for weekly and monthly signals
     historical_data.set_index('Date', inplace=True)
@@ -104,14 +137,13 @@ def process_historical_data(historical_data, stock_symbol):
     except Exception as e:
         df_weekly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
         df_weekly['Final_Signal'] = 'Not Sufficient Information'
-
     if df_weekly.empty:
         df_weekly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
         df_weekly['Final_Signal'] = 'Not Sufficient Information'
     else:
         df_weekly = generate_signals(df_weekly)
     try:
-    # Monthly resampling
+        # Monthly resampling
         df_monthly = historical_data.resample('ME').agg({
             'LastTradePrice': 'last',
             'Max': 'max',
@@ -127,49 +159,95 @@ def process_historical_data(historical_data, stock_symbol):
     except Exception as e:
         df_monthly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
         df_monthly['Final_Signal'] = 'Not Sufficient Information'
-
     if df_monthly.empty:
         df_monthly = pd.DataFrame(columns=['Date', 'LastTradePrice', 'Final_Signal'])
         df_monthly['Final_Signal'] = 'Not Sufficient Information'
     else:
         df_monthly = generate_signals(df_monthly)
-
     # Reset indices for JSON serialization
     df_weekly.reset_index(inplace=True)
     df_monthly.reset_index(inplace=True)
+    return df_monthly, df_weekly, historical_data
 
-    # Generate candlestick data
-    df_candlestick = historical_data[['LastTradePrice', 'Max', 'Min']].reset_index()
-    df_candlestick.columns = ['date', 'close', 'high', 'low']
-    df_candlestick['open'] = df_candlestick['close']
-    candlestick_data = df_candlestick.to_dict(orient='records')
 
-    # Plot candlestick chart
-    df_candlestick.set_index('date', inplace=True)
-    chart_filename = f"candlestick_{stock_symbol}.png"
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    static_dir = os.path.join(current_dir, '..', 'static', 'charts')
-    chart_path = os.path.join(static_dir, chart_filename)
-    mpf.plot(df_candlestick, type='candle', style='charles', title=f'Candlestick Chart for {stock_symbol}',
-             volume=False, savefig=chart_path)
+def clean_numeric_column(value):
+    """Converts numeric strings with thousands separators ('.') and decimal commas (',') to float."""
+    if isinstance(value, str):
+        try:
+            return float(value.replace('.', '').replace(',', '.'))
+        except ValueError:
+            return 0
+    elif isinstance(value, (int, float)):
+        return value  # Already numeric
+    else:
+        return 0
 
-    # Extended `final_signals` to include additional values:
-    final_signals = {
-        "daily": historical_data.reset_index()[[
-            'Date', 'LastTradePrice', 'Final_Signal', 'RSI',
-            'Momentum', 'Stochastic_Oscillator', 'SMA_10', 'EMA_10'
-        ]].tail().to_dict(orient='records'),
-        "weekly": df_weekly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI', 'Momentum',
-                             'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(orient='records'),
-        "monthly": df_monthly[['Date', 'LastTradePrice', 'Final_Signal', 'RSI', 'Momentum',
-                               'Stochastic_Oscillator', 'SMA_10', 'EMA_10']].tail().to_dict(orient='records')
-    }
+def generate_signals(df):
+    # Check if required columns exist
+    required_columns = ['RSI', 'Momentum', 'Williams_%R', 'Stochastic_Oscillator']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        df['Final_Signal'] = 'Not Sufficient Information'
+        return df
 
-    return {
-        "candlestick_data": candlestick_data,
-        "chart_path": chart_path,
-        "final_signals": final_signals
-    }
+    # Generate individual signals
+    df['RSI_Signal'] = np.where(df['RSI'] < 30, 'Buy',
+                                np.where(df['RSI'] > 70, 'Sell', 'Hold'))
+    df['Momentum_Signal'] = np.where(df['Momentum'] > 0, 'Buy', 'Sell')
+    df['WPR_Signal'] = np.where(df['Williams_%R'] < -80, 'Buy',
+                                 np.where(df['Williams_%R'] > -20, 'Sell', 'Hold'))
+    df['Stochastic_Signal'] = np.where(df['Stochastic_Oscillator'] < 20, 'Buy',
+                                        np.where(df['Stochastic_Oscillator'] > 80, 'Sell', 'Hold'))
+
+    # Safely compute the mode for Final_Signal
+    signal_mode = df[['RSI_Signal', 'Momentum_Signal', 'WPR_Signal', 'Stochastic_Signal']].mode(axis=1)
+    if signal_mode.empty:
+        df['Final_Signal'] = 'Hold'
+    else:
+        df['Final_Signal'] = signal_mode[0].fillna('Hold')  # Default to 'Hold' for NaN values
+
+    return df
+
+def analyze_data(df, context):
+    # Apply the strategies
+    df['RSI'] = context.execute_strategy('RSI', df['LastTradePrice'])
+    df['Momentum'] = context.execute_strategy('SMA', df['LastTradePrice'].diff(), window=10)  # Assuming momentum uses SMA logic
+    df['Williams_%R'] = context.execute_strategy(
+        'Williams',
+        df['LastTradePrice'],
+        high=df['Max'],
+        low=df['Min'],
+        window=14
+    )
+    df['Stochastic_Oscillator'] = context.execute_strategy(
+        'StochasticOscillator',
+        df['LastTradePrice'],
+        high=df['Max'],
+        low=df['Min'],
+        window=14
+    )
+    df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = context.execute_strategy(
+        'BollingerBands',
+        df['LastTradePrice'],
+        window=10
+    )
+    df['SMA_10'] = context.execute_strategy('SMA', df['LastTradePrice'], window=10)
+    df['SMA_20'] = context.execute_strategy('SMA', df['LastTradePrice'], window=20)
+    df['SMA_50'] = context.execute_strategy('SMA', df['LastTradePrice'], window=50)
+    df['EMA_10'] = context.execute_strategy('EMA', df['LastTradePrice'], window=10)
+    df['EMA_20'] = context.execute_strategy('EMA', df['LastTradePrice'], window=20)
+    df['EMA_50'] = context.execute_strategy('EMA', df['LastTradePrice'], window=50)
+    df['BB_MA'], df['BB_Upper'], df['BB_Lower'] = context.execute_strategy('BollingerBands', df['LastTradePrice'], window=10)
+
+    # Ultimate Oscillator calculation (not part of the strategies yet)
+    df['Ultimate_Oscillator'] = (df['LastTradePrice'] - df['Min']) / (df['Max'] - df['Min'])  # Placeholder logic
+
+    # Generate signals
+    df = generate_signals(df)
+
+    return df
+
+
 
 if __name__ == '__main__':
     test_database_connection()
