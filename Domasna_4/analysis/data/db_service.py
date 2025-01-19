@@ -49,7 +49,7 @@ def cursor_db():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        print(f"Query: {query}, params {params}")
+        #print(f"Query: {query}, params {params}")
         cursor.execute(query, params)
 
         if query.strip().lower().startswith("select"):
